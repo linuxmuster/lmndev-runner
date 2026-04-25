@@ -51,16 +51,25 @@ if ! docker image inspect "${IMAGE_NAME}:latest" >/dev/null 2>&1; then
     exit 1
 fi
 
-echo "Starte ${IMAGE_NAME} ..."
+echo "Starting ${IMAGE_NAME} ..."
 echo "  Workspace: ${WORKSPACE} -> /workspace"
 echo "  Shell:     ${SHELL_OVERRIDE}"
 echo "  User:      ${MY_USER} (${MY_UID}:${MY_GID})"
 [ -n "${HOME_VOLUME}" ] && echo "  Home:      ${HOME_VOLUME} -> /home/${MY_USER}"
 echo ""
 
+# check if home volume is given
 HOME_MOUNT=""
 [ -n "${HOME_VOLUME}" ] && HOME_MOUNT="-v ${HOME_VOLUME}:/home/${MY_USER}"
 
+# check if distcc/hosts exists and is not empty, then mount it read-only
+DISTCC_MOUNT=""
+distcc_hosts="/etc/distcc/hosts"
+if [ -s "$distcc_hosts" ]; then
+    DISTCC_MOUNT="-v ${distcc_hosts}:${distcc_hosts}:ro"
+fi
+
+# run docker container interactively
 docker run -it --rm \
     --name "${IMAGE_NAME}" \
     -h "${IMAGE_NAME}" \
@@ -69,5 +78,6 @@ docker run -it --rm \
     -v /etc/localtime:/etc/localtime:ro \
     -v "${WORKSPACE}:/workspace" \
     ${HOME_MOUNT} \
+    ${DISTCC_MOUNT} \
     -w /workspace \
     "${IMAGE_NAME}:latest"
