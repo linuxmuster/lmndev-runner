@@ -50,22 +50,11 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get \
 # linuxmuster-common aus dem neuesten GitHub Release
 RUN DEBIAN_FRONTEND=noninteractive gdebi -n /tmp/linuxmuster-common.deb
 
-# Konfigurierte Shell installieren
-RUN case "${DEFAULT_SHELL}" in \
-        ash) \
-            DEBIAN_FRONTEND=noninteractive apt-get \
-                -o "Dpkg::Options::=--force-confold" -y install busybox && \
-            ln -sf /bin/busybox /bin/ash \
-            ;; \
-        fish) \
-            DEBIAN_FRONTEND=noninteractive apt-get \
-                -o "Dpkg::Options::=--force-confold" -y install fish \
-            ;; \
-        *) \
-            DEBIAN_FRONTEND=noninteractive apt-get \
-                -o "Dpkg::Options::=--force-confold" -y install "${DEFAULT_SHELL}" \
-            ;; \
-    esac
+# Alle unterstützten Shells installieren (Auswahl zur Laufzeit per DEFAULT_SHELL)
+RUN DEBIAN_FRONTEND=noninteractive apt-get \
+        -o "Dpkg::Options::=--force-confold" -y install \
+    bash zsh fish busybox && \
+    ln -sf /bin/busybox /bin/ash
 
 # Optionale lokale Pakete
 RUN if [ -n "${EXTRA_PACKAGES}" ]; then \
