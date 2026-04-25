@@ -11,6 +11,8 @@
 # 20260425
 #
 
+set -e
+
 # Quellverzeichnis bestimmen
 get_workspace() {
     if [ -n "$GITHUB_WORKSPACE" ]; then
@@ -18,7 +20,7 @@ get_workspace() {
     elif [ -n "$WORKSPACE" ]; then
         echo "$WORKSPACE"
     else
-        echo "$(pwd)"
+        pwd
     fi
 }
 
@@ -33,6 +35,34 @@ install_missing_deps() {
     sudo DEBIAN_FRONTEND=noninteractive apt-get build-dep -y .
 }
 
+# Erzeugte Pakete in OUTPUT_DIR verschieben und auflisten.
+# dpkg-buildpackage schreibt in das Elternverzeichnis des Quellbaums.
+collect_output() {
+    local src="$1"
+    local parent_dir
+    parent_dir="$(dirname "$src")"
+
+    echo "--- Suche erzeugte Pakete in: ${parent_dir}"
+
+    local count=0
+    while IFS= read -r f; do
+        echo "    -> ${f}"
+        mv "$f" "$OUTPUT_DIR/"
+        count=$((count + 1))
+    done < <(find "$parent_dir" -maxdepth 1 \
+        \( -name "*.deb" -o -name "*.changes" -o -name "*.buildinfo" \) \
+        2>/dev/null | sort)
+
+    if [ "$count" -eq 0 ]; then
+        echo "WARNUNG: Keine erzeugten Pakete in ${parent_dir} gefunden."
+        echo "         Inhalt von ${parent_dir}:"
+        ls -la "$parent_dir" | grep -v '^total' | head -20
+        return 1
+    fi
+
+    echo "    ${count} Datei(en) verschoben nach: ${OUTPUT_DIR}"
+}
+
 # Debian-Paket bauen
 build_package() {
     local src
@@ -45,6 +75,7 @@ build_package() {
     version="$(dpkg-parsechangelog -S Version 2>/dev/null || echo "unbekannt")"
 
     echo "=== Baue ${pkg} (${version}) in ${src} ==="
+    echo "    Elternverzeichnis (Paketausgabe): $(dirname "$src")"
 
     # ccache aktivieren wenn verfügbar
     if command -v ccache >/dev/null 2>&1; then
@@ -57,14 +88,10 @@ build_package() {
 
     dpkg-buildpackage -us -uc -b -tc ${BUILD_FLAGS}
 
-    echo "=== ${pkg} fertig gebaut ==="
+    echo "=== ${pkg} (${version}) erfolgreich gebaut ==="
 
-    # Erzeugte Dateien in OUTPUT_DIR verschieben
     if [ -n "$OUTPUT_DIR" ]; then
         mkdir -p "$OUTPUT_DIR"
-        find "$(dirname "$src")" -maxdepth 1 \
-            \( -name "*.deb" -o -name "*.changes" -o -name "*.buildinfo" \) \
-            -exec mv {} "$OUTPUT_DIR/" \;
-        echo "    Pakete verschoben nach: ${OUTPUT_DIR}"
+        collect_output "$src"
     fi
 }
