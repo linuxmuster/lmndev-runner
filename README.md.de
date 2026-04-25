@@ -102,12 +102,28 @@ PROJECTS="linuxmuster-api linuxmuster-base7 ..."
 |---|---|---|
 | `UBUNTU_VERSION` | Ubuntu-Basisversion | `26.04` |
 | `UBUNTU_FALLBACK` | Fallback-Version | `24.04` |
-| `DEFAULT_SHELL` | Shell im Container | `bash` |
-| `EXTRA_PACKAGES` | Zusätzliche lokale Pakete | *(leer)* |
+| `DEFAULT_SHELL` | Standard-Shell beim Start von `start.sh` | `bash` |
+| `EXTRA_PACKAGES` | Überschreibt die Standard-Extrapakete des Dockerfiles | *(leer = Dockerfile-Standard wird genutzt)* |
 | `MY_UID` / `MY_GID` | UID/GID des Build-Users | `1000` / `1000` |
 | `PROJECTS` | Zu unterstützende Projekte | alle 12 Projekte |
 
+### EXTRA_PACKAGES
+
+Das Dockerfile enthält bereits einen sinnvollen Satz an Standard-Extrapaketen:
+
+```
+openssh-client iputils-ping net-tools wget bash bash-completion zsh
+zsh-autosuggestions zsh-syntax-highlighting ccache distcc curl
+dpkg-dev debdelta sudo vim git
+```
+
+Bleibt `EXTRA_PACKAGES` in `config` leer, werden diese Dockerfile-Standards verwendet.
+Ist `EXTRA_PACKAGES` in `config` gesetzt, **ersetzt** es die Dockerfile-Standards vollständig.
+
 ### Shell-Optionen
+
+Alle vier Shells sind **immer** im Image installiert — unabhängig von der Konfiguration.
+Die gewünschte Shell wird erst zur Laufzeit ausgewählt.
 
 | Wert | Paket | Shell-Pfad |
 |---|---|---|
@@ -179,17 +195,39 @@ mit `gdebi` installiert, um Abhängigkeiten automatisch aufzulösen.
 ### Container interaktiv starten
 
 ```sh
-./start.sh [verzeichnis]
+./start.sh [quellverzeichnis] [shell] [homeverzeichnis]
 ```
 
-Das angegebene Verzeichnis (Standard: aktuelles Verzeichnis) wird als `/workspace`
-in den Container eingebunden. Die konfigurierte Shell startet automatisch.
+| Argument | Beschreibung | Standard |
+|---|---|---|
+| `quellverzeichnis` | Wird als `/workspace` eingebunden | aktuelles Verzeichnis |
+| `shell` | Shell im Container: `bash`, `zsh`, `ash`, `fish` | `DEFAULT_SHELL` aus `config` |
+| `homeverzeichnis` | Host-Verzeichnis für `/home/build` | keines |
 
-**Beispiel:** Quellcode von `linuxmuster-base7` bauen:
+Die Shell kann auch über die Umgebungsvariable `DEFAULT_SHELL` gesetzt werden.
+Das Home-Verzeichnis kann alternativ über `BUILD_HOME` übergeben werden.
+
+**Beispiele:**
 
 ```sh
+# Einfacher Start mit Standard-Shell
 cd ~/src/linuxmuster-base7
 /pfad/zu/lmndev-runner/start.sh .
+
+# zsh als Shell verwenden
+/pfad/zu/lmndev-runner/start.sh ~/src/linuxmuster-base7 zsh
+
+# Mit eigenem Home-Verzeichnis (Shell-Konfiguration, History, …)
+/pfad/zu/lmndev-runner/start.sh ~/src/linuxmuster-base7 zsh ~/lmndev-home
+
+# Shell per Umgebungsvariable
+DEFAULT_SHELL=fish /pfad/zu/lmndev-runner/start.sh ~/src/linuxmuster-base7
+
+# Home-Verzeichnis per Umgebungsvariable
+BUILD_HOME=~/lmndev-home /pfad/zu/lmndev-runner/start.sh ~/src/linuxmuster-base7
+```
+
+```sh
 # Im Container:
 linuxmuster-base7.sh
 ```

@@ -102,12 +102,28 @@ PROJECTS="linuxmuster-api linuxmuster-base7 ..."
 | --- | --- | --- |
 | `UBUNTU_VERSION` | Ubuntu base version | `26.04` |
 | `UBUNTU_FALLBACK` | Fallback version | `24.04` |
-| `DEFAULT_SHELL` | Shell in the container | `bash` |
-| `EXTRA_PACKAGES` | Additional local packages | *(empty)* |
+| `DEFAULT_SHELL` | Default shell when starting `start.sh` | `bash` |
+| `EXTRA_PACKAGES` | Overrides the Dockerfile's default extra packages | *(empty = Dockerfile defaults are used)* |
 | `MY_UID` / `MY_GID` | UID/GID of the build user | `1000` / `1000` |
 | `PROJECTS` | Projects to support | all 12 projects |
 
+### EXTRA_PACKAGES
+
+The Dockerfile already ships a sensible default set of extra packages:
+
+```text
+openssh-client iputils-ping net-tools wget bash bash-completion zsh
+zsh-autosuggestions zsh-syntax-highlighting ccache distcc curl
+dpkg-dev debdelta sudo vim git
+```
+
+When `EXTRA_PACKAGES` is empty in `config`, these Dockerfile defaults are used.
+When `EXTRA_PACKAGES` is set in `config`, it **replaces** the Dockerfile defaults entirely.
+
 ### Shell Options
+
+All four shells are **always** installed in the image — regardless of configuration.
+The desired shell is selected at runtime only.
 
 | Value | Package | Shell Path |
 | --- | --- | --- |
@@ -179,17 +195,39 @@ and installed with `gdebi` to automatically resolve its dependencies.
 ### Start the container interactively
 
 ```sh
-./start.sh [directory]
+./start.sh [source-directory] [shell] [home-directory]
 ```
 
-The specified directory (default: current directory) is mounted into the container
-as `/workspace`. The configured shell starts automatically.
+| Argument | Description | Default |
+| --- | --- | --- |
+| `source-directory` | Mounted as `/workspace` | current directory |
+| `shell` | Shell in the container: `bash`, `zsh`, `ash`, `fish` | `DEFAULT_SHELL` from `config` |
+| `home-directory` | Host directory mounted as `/home/build` | none |
 
-**Example:** Build the `linuxmuster-base7` source:
+The shell can also be set via the `DEFAULT_SHELL` environment variable.
+The home directory can alternatively be passed via `BUILD_HOME`.
+
+**Examples:**
 
 ```sh
+# Simple start with default shell
 cd ~/src/linuxmuster-base7
 /path/to/lmndev-runner/start.sh .
+
+# Use zsh as shell
+/path/to/lmndev-runner/start.sh ~/src/linuxmuster-base7 zsh
+
+# With a custom home directory (shell config, history, …)
+/path/to/lmndev-runner/start.sh ~/src/linuxmuster-base7 zsh ~/lmndev-home
+
+# Shell via environment variable
+DEFAULT_SHELL=fish /path/to/lmndev-runner/start.sh ~/src/linuxmuster-base7
+
+# Home directory via environment variable
+BUILD_HOME=~/lmndev-home /path/to/lmndev-runner/start.sh ~/src/linuxmuster-base7
+```
+
+```sh
 # Inside the container:
 linuxmuster-base7.sh
 ```
