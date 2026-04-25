@@ -31,10 +31,21 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get \
     bash bash-completion ccache curl debhelper dpkg-dev fakeroot gdebi-core \
     git gnupg gpg sudo tzdata wget
 
-# Projekt-Build-Abhängigkeiten (aus deps.txt, von collect-deps.sh generiert)
+# Projekt-Build-Abhängigkeiten (aus deps.txt, von collect-deps.sh generiert).
+# Erst alle auf einmal versuchen; schlägt ein Paket fehl (z.B. nicht in Ubuntu
+# verfügbar), Einzelinstallation mit Warnung — so werden alle verfügbaren Pakete
+# sicher installiert.
 RUN DEBIAN_FRONTEND=noninteractive apt-get \
         -o "Dpkg::Options::=--force-confold" -y install \
-    $(cat /tmp/deps.txt) || true
+        $(cat /tmp/deps.txt) \
+    || { \
+        echo "--- Einzelinstallation (nicht verfügbare Pakete werden übersprungen) ---"; \
+        for pkg in $(cat /tmp/deps.txt); do \
+            DEBIAN_FRONTEND=noninteractive apt-get \
+                -o "Dpkg::Options::=--force-confold" -y install "$pkg" \
+            || echo "WARNUNG: $pkg nicht verfügbar, übersprungen."; \
+        done; \
+    }
 
 # linuxmuster-common aus dem neuesten GitHub Release
 RUN DEBIAN_FRONTEND=noninteractive gdebi -n /tmp/linuxmuster-common.deb
