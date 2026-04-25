@@ -1,0 +1,100 @@
+# Release-Workflow für linuxmuster-fileserver
+#
+# Verwendung: Diese Datei in das linuxmuster-fileserver-Repository kopieren:
+#   .github/workflows/release.yml
+#
+# Version und Ziel-Distribution werden automatisch aus der ersten Zeile
+# von debian/changelog gelesen. Beispiel:
+#   linuxmuster-fileserver (7.3.5-0) lmn73; urgency=medium
+#
+# Benötigte Repository-Secrets:
+#   REPO_HOST       Hostname des APT-Repository-Servers
+#   REPO_USER       SSH-Benutzer auf dem Repository-Server
+#   REPO_SSH_KEY    Privater SSH-Schlüssel für den Repository-Server
+#
+# thomas@linuxmuster.net
+# 20260425
+
+name: Release
+
+on:
+  push:
+    tags:
+      - '[0-9]*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/linuxmuster/lmndev-runner:latest
+      options: --user root
+
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      distribution: ${{ steps.meta.outputs.distribution }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Version und Distribution aus debian/changelog lesen
+        id: meta
+        run: |
+          echo "version=$(dpkg-parsechangelog -S Version)" >> "$GITHUB_OUTPUT"
+          echo "distribution=$(dpkg-parsechangelog -S Distribution)" >> "$GITHUB_OUTPUT"
+
+      - name: Paket bauen
+        run: /opt/lmndev/build/linuxmuster-fileserver.sh
+        env:
+          OUTPUT_DIR: ${{ github.workspace }}/packages
+
+      - name: Pakete als Artefakte speichern
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: packages/
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Pakete herunterladen
+        uses: actions/download-artifact@v4
+        with:
+          name: packages
+          path: packages/
+
+      - name: GitHub Release erstellen
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.build.outputs.version }}
+          files: packages/*.deb
+          generate_release_notes: true
+
+  publish:
+    needs: [build, release]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Pakete herunterladen
+        uses: actions/download-artifact@v4
+        with:
+          name: packages
+          path: packages/
+
+      - name: In APT-Repository veröffentlichen (${{ needs.build.outputs.distribution }})
+        run: |
+          for deb in packages/*.deb; do
+            scp -i <(echo "${{ secrets.REPO_SSH_KEY }}") \
+                -o StrictHostKeyChecking=no \
+                "$deb" \
+                "${{ secrets.REPO_USER }}@${{ secrets.REPO_HOST }}:~/incoming/${{ needs.build.outputs.distribution }}/"
+          done
+          ssh -i <(echo "${{ secrets.REPO_SSH_KEY }}") \
+              -o StrictHostKeyChecking=no \
+              "${{ secrets.REPO_USER }}@${{ secrets.REPO_HOST }}" \
+              "repo-update ${{ needs.build.outputs.distribution }}"

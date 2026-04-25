@@ -25,4 +25,7 @@
 - Für die Nutzung als lokales Buildsystem sollen zusätzlich zu installierende Pakete
   konfigurierbar sein.
 - Ebenso soll die Shell konfigurierbar sein (bash, zsh, ash, fish).
-- Für jedes Projekt soll ein eigenes Buildskript erstellt werden.
+- Für jedes Projekt soll
+  - ein eigenes Buildskript erstellt werden.
+  - im Unterordner workflows eine release.yml Beispieldatei angelegt werden, die für den
+    Github-Workflow mit den Distributionen lmn73 und lmn74 verwendet werden kann.
