@@ -68,7 +68,7 @@ RELEASE_JSON="$TMPDIR_WORK/release.json"
 curl -sf --max-time 30 "$RELEASE_API" -o "$RELEASE_JSON"
 RELEASE_TAG="$(python3 -c "import json; print(json.load(open('$RELEASE_JSON'))['tag_name'])")"
 
-DEB_URL="$(python3 - <<'EOF'
+DEB_URL="$(python3 - "$RELEASE_JSON" <<'EOF'
 import json, sys
 data = json.load(open(sys.argv[1]))
 assets = data.get("assets", [])
@@ -80,7 +80,7 @@ for suffix in ("_all.deb", ".deb"):
         sys.exit(0)
 sys.exit(1)
 EOF
-"$RELEASE_JSON")"
+)"
 
 if [ -z "$DEB_URL" ]; then
     echo "FEHLER: Kein .deb-Paket im Release ${RELEASE_TAG} gefunden."
