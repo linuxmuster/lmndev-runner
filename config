@@ -1,0 +1,33 @@
+#!/bin/sh
+#
+# lmndev-runner Konfiguration
+#
+# thomas@linuxmuster.net
+# 20260425
+#
+
+# Ubuntu-Version (Fallback wenn die primäre Version nicht verfügbar ist)
+UBUNTU_VERSION="26.04"
+UBUNTU_FALLBACK="24.04"
+
+# Image-Name und GHCR-Pfad
+IMAGE_NAME="lmndev-runner"
+GHCR_IMAGE="ghcr.io/linuxmuster/lmndev-runner"
+
+# Standard-Shell im Container (bash | zsh | ash | fish)
+DEFAULT_SHELL="bash"
+
+# Zusätzliche Pakete für die lokale Nutzung (leer lassen für GitHub Actions)
+EXTRA_PACKAGES=""
+
+# Build-User im Container
+MY_USER="build"
+MY_UID="1000"
+MY_GID="1001"
+
+# GitHub-Organisation und Common-Repository
+GITHUB_ORG="linuxmuster"
+COMMON_REPO="linuxmuster-common"
+
+# Unterstützte Projekte (leerzeichen-getrennt)
+PROJECTS="linuxmuster-api linuxmuster-base7 linuxmuster-cli7 linuxmuster-common linuxmuster-fileserver linuxmuster-linbo7 linuxmuster-linbo-gui linuxmuster-linuxclient7 linuxmuster-prepare linuxmuster-tools linuxmuster-webui7 sophomorix4"

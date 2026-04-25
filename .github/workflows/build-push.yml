@@ -1,0 +1,74 @@
+# lmndev-runner: Docker Image bauen und zu GHCR pushen
+#
+# Wird ausgelöst bei Push auf main (außer Dokumentationsänderungen)
+# oder manuell via workflow_dispatch.
+#
+# thomas@linuxmuster.net
+# 20260425
+
+name: Build and Push Docker Image
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "*.md"
+      - "anforderungen.md.de"
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: linuxmuster/lmndev-runner
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ubuntu-Version prüfen
+        id: ubuntu
+        run: |
+          . ./config
+          if docker pull "ubuntu:${UBUNTU_VERSION}" >/dev/null 2>&1; then
+            echo "tag=${UBUNTU_VERSION}" >> "$GITHUB_OUTPUT"
+          else
+            echo "WARNUNG: ubuntu:${UBUNTU_VERSION} nicht verfügbar, nutze ${UBUNTU_FALLBACK}"
+            echo "tag=${UBUNTU_FALLBACK}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build-Abhängigkeiten sammeln und linuxmuster-common herunterladen
+        run: bash collect-deps.sh
+
+      - name: Anmeldung bei GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker Buildx einrichten
+        uses: docker/setup-buildx-action@v3
+
+      - name: Docker Image bauen und pushen
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          build-args: |
+            UBUNTU_VERSION=${{ steps.ubuntu.outputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Temporäre Dateien entfernen
+        if: always()
+        run: rm -f deps.txt linuxmuster-common.deb
