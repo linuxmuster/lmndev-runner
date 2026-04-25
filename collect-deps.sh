@@ -25,24 +25,33 @@ echo "--- Sammle Build-Abhängigkeiten ..."
 > "$TMPDIR_WORK/all_deps.txt"
 
 for project in $PROJECTS; do
-    ctrl_url="${CONTROL_BASE_URL}/${project}/main/debian/control"
     ctrl_file="$TMPDIR_WORK/${project}.control"
 
     printf "  %-40s" "$project ..."
-    if curl -sf --max-time 10 "$ctrl_url" -o "$ctrl_file"; then
-        echo "OK"
-        awk '/^Build-Depends:/{
-            sub(/^Build-Depends: */, "")
-            block = $0
-            while ((getline line) > 0) {
-                if (line ~ /^[ \t]/) { block = block " " line }
-                else { break }
-            }
-            print block
-        }' "$ctrl_file" >> "$TMPDIR_WORK/all_deps.txt"
-    else
-        echo "WARNUNG: nicht erreichbar"
+    fetched=false
+    for branch in main master; do
+        ctrl_url="${CONTROL_BASE_URL}/${project}/${branch}/debian/control"
+        if curl -sf --max-time 10 "$ctrl_url" -o "$ctrl_file"; then
+            echo "OK (${branch})"
+            fetched=true
+            break
+        fi
+    done
+
+    if [ "$fetched" = false ]; then
+        echo "WARNUNG: debian/control nicht erreichbar"
+        continue
     fi
+
+    awk '/^Build-Depends:/{
+        sub(/^Build-Depends: */, "")
+        block = $0
+        while ((getline line) > 0) {
+            if (line ~ /^[ \t]/) { block = block " " line }
+            else { break }
+        }
+        print block
+    }' "$ctrl_file" >> "$TMPDIR_WORK/all_deps.txt"
 done
 
 # Paketliste normalisieren: Version-Constraints entfernen, deduplizieren,
