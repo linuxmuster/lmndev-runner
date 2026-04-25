@@ -8,9 +8,7 @@
 #   linuxmuster-prepare (7.3.5-0) lmn73; urgency=medium
 #
 # Benötigte Repository-Secrets:
-#   REPO_HOST       Hostname des APT-Repository-Servers
-#   REPO_USER       SSH-Benutzer auf dem Repository-Server
-#   REPO_SSH_KEY    Privater SSH-Schlüssel für den Repository-Server
+#   REPO_SSH_KEY    GitHub-SSH-Schlüssel für das linuxmuster/deb-Repository
 #
 # thomas@linuxmuster.net
 # 20260425
@@ -86,15 +84,28 @@ jobs:
           name: packages
           path: packages/
 
-      - name: In APT-Repository veröffentlichen (${{ needs.build.outputs.distribution }})
+      - name: Archiv-Repository klonen
+        uses: actions/checkout@v4
+        with:
+          repository: linuxmuster/deb
+          ssh-key: ${{ secrets.REPO_SSH_KEY }}
+          path: deb
+
+      - name: Pakete einstellen und pushen (${{ needs.build.outputs.distribution }})
         run: |
-          for deb in packages/*.deb; do
-            scp -i <(echo "${{ secrets.REPO_SSH_KEY }}") \
-                -o StrictHostKeyChecking=no \
-                "$deb" \
-                "${{ secrets.REPO_USER }}@${{ secrets.REPO_HOST }}:~/incoming/${{ needs.build.outputs.distribution }}/"
-          done
-          ssh -i <(echo "${{ secrets.REPO_SSH_KEY }}") \
-              -o StrictHostKeyChecking=no \
-              "${{ secrets.REPO_USER }}@${{ secrets.REPO_HOST }}" \
-              "repo-update ${{ needs.build.outputs.distribution }}"
+          PACKAGE="linuxmuster-prepare"
+          DISTRIBUTION="${{ needs.build.outputs.distribution }}"
+          VERSION="${{ needs.build.outputs.version }}"
+          BRANCH="$(echo "$PACKAGE-$DISTRIBUTION-$VERSION" | sed 's/~/tilde/')"
+
+          mkdir -p "deb/packages/$PACKAGE/$DISTRIBUTION"
+          rm -rf "deb/packages/$PACKAGE/$DISTRIBUTION/"*
+          cp packages/* "deb/packages/$PACKAGE/$DISTRIBUTION/"
+
+          cd deb
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git checkout -b "update/$BRANCH"
+          git add .
+          git commit -m "Update $PACKAGE/$DISTRIBUTION to $VERSION (by GitHub Actions)"
+          git push --set-upstream origin "update/$BRANCH"
