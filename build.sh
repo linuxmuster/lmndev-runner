@@ -1,10 +1,10 @@
 #!/bin/bash
 #
-# Erstellt das lmndev-runner Docker-Image lokal.
-# Ruft collect-deps.sh auf und baut dann das Image.
+# Builds the lmndev-runner Docker image locally.
+# Calls collect-deps.sh and then builds the image.
 #
-# Verwendung: ./build.sh [--no-collect]
-#   --no-collect  deps.txt und linuxmuster-common.deb nicht neu generieren
+# Usage: ./build.sh [--no-collect]
+#   --no-collect  Do not regenerate deps.txt and linuxmuster-common.deb
 #
 # thomas@linuxmuster.net
 # 20260425
@@ -29,14 +29,14 @@ echo "  Shell:   ${DEFAULT_SHELL}"
 [ -n "$EXTRA_PACKAGES" ] && echo "  Extras:  ${EXTRA_PACKAGES}"
 echo ""
 
-# Ubuntu-Version prüfen, ggf. Fallback
+# Check Ubuntu version, use fallback if necessary
 UBUNTU_TAG="$UBUNTU_VERSION"
 if ! docker pull "ubuntu:${UBUNTU_VERSION}" >/dev/null 2>&1; then
     echo "WARNUNG: ubuntu:${UBUNTU_VERSION} nicht verfügbar, nutze Fallback: ${UBUNTU_FALLBACK}"
     UBUNTU_TAG="$UBUNTU_FALLBACK"
 fi
 
-# Abhängigkeiten sammeln (ausser --no-collect)
+# Collect dependencies (unless --no-collect)
 if [ "$NO_COLLECT" = false ]; then
     bash "$SCRIPT_DIR/collect-deps.sh"
     echo ""
@@ -46,7 +46,7 @@ else
     [ -f linuxmuster-common.deb ] || { echo "FEHLER: linuxmuster-common.deb nicht vorhanden."; exit 1; }
 fi
 
-# Docker Image bauen
+# Build Docker image
 echo "--- Baue Docker Image: ${IMAGE_NAME} ..."
 EXTRA_PACKAGES_ARG=""
 [ -n "${EXTRA_PACKAGES}" ] && EXTRA_PACKAGES_ARG="--build-arg EXTRA_PACKAGES=${EXTRA_PACKAGES}"
@@ -62,7 +62,7 @@ docker build \
     -t "${GHCR_IMAGE}:latest" \
     .
 
-# Temporäre Dateien entfernen
+# Remove temporary files
 rm -f deps.txt linuxmuster-common.deb
 
 echo ""

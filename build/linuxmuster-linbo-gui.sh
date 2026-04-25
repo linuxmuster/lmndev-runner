@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Build-Skript für linuxmuster-linbo-gui
+# Build script for linuxmuster-linbo-gui
 # thomas@linuxmuster.net
 
 source /opt/lmndev/build/common.sh

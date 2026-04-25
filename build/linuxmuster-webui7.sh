@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Build-Skript für linuxmuster-webui7
+# Build script for linuxmuster-webui7
 # thomas@linuxmuster.net
 
 source /opt/lmndev/build/common.sh

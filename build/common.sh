@@ -1,11 +1,11 @@
 #!/bin/bash
 #
-# Gemeinsame Build-Funktionen für lmndev-runner Pro-Projekt-Skripte.
+# Shared build functions for lmndev-runner per-project scripts.
 #
-# Umgebungsvariablen:
-#   WORKSPACE    Quellverzeichnis (Standard: GITHUB_WORKSPACE oder pwd)
-#   OUTPUT_DIR   Zielverzeichnis für erzeugte .deb/.changes-Dateien
-#   BUILD_FLAGS  Zusätzliche dpkg-buildpackage-Flags
+# Environment variables:
+#   WORKSPACE    Source directory (default: GITHUB_WORKSPACE or pwd)
+#   OUTPUT_DIR   Target directory for generated .deb/.changes files
+#   BUILD_FLAGS  Additional dpkg-buildpackage flags
 #
 # thomas@linuxmuster.net
 # 20260425
@@ -13,7 +13,7 @@
 
 set -e
 
-# Quellverzeichnis bestimmen
+# Determine source directory
 get_workspace() {
     if [ -n "$GITHUB_WORKSPACE" ]; then
         echo "$GITHUB_WORKSPACE"
@@ -24,9 +24,9 @@ get_workspace() {
     fi
 }
 
-# Fehlende Build-Abhängigkeiten der aktuellen debian/control nachinstallieren.
-# Wird automatisch aufgerufen, damit Feature-Branches mit abweichenden
-# Build-Deps ohne Image-Rebuild gebaut werden können.
+# Install missing build dependencies for the current debian/control.
+# Called automatically so feature branches with different build deps
+# can be built without rebuilding the image.
 install_missing_deps() {
     dpkg-checkbuilddeps 2>/dev/null && return 0
 
@@ -35,8 +35,8 @@ install_missing_deps() {
     sudo DEBIAN_FRONTEND=noninteractive apt-get build-dep -y .
 }
 
-# Erzeugte Pakete in OUTPUT_DIR verschieben und auflisten.
-# dpkg-buildpackage schreibt in das Elternverzeichnis des Quellbaums.
+# Move and list generated packages into OUTPUT_DIR.
+# dpkg-buildpackage writes to the parent directory of the source tree.
 collect_output() {
     local src="$1"
     local parent_dir
@@ -64,7 +64,7 @@ collect_output() {
     echo "    ${count} Datei(en) verschoben nach: ${OUTPUT_DIR}"
 }
 
-# Debian-Paket bauen
+# Build Debian package
 build_package() {
     local src
     src="$(get_workspace)"
@@ -78,7 +78,7 @@ build_package() {
     echo "=== Baue ${pkg} (${version}) in ${src} ==="
     echo "    Elternverzeichnis (Paketausgabe): $(dirname "$src")"
 
-    # ccache aktivieren wenn verfügbar
+    # Enable ccache if available
     if command -v ccache >/dev/null 2>&1; then
         export PATH="/usr/lib/ccache:$PATH"
         export CCACHE_DIR="${CCACHE_DIR:-/tmp/ccache}"

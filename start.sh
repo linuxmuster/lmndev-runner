@@ -1,16 +1,16 @@
 #!/bin/bash
 #
-# Startet den lmndev-runner Container interaktiv.
+# Starts the lmndev-runner container interactively.
 #
-# Verwendung: ./start.sh [quellverzeichnis] [shell] [homeverzeichnis]
-#   quellverzeichnis  Verzeichnis, das als /workspace eingebunden wird
-#                     (Standard: aktuelles Verzeichnis)
-#   shell             Shell im Container: bash | zsh | ash | fish
-#                     (Standard: DEFAULT_SHELL aus config)
-#   homeverzeichnis   Host-Verzeichnis, das als /home/build eingebunden wird
-#                     (Standard: keines; auch per BUILD_HOME setzbar)
+# Usage: ./start.sh [source-directory] [shell] [home-directory]
+#   source-directory  Directory mounted as /workspace
+#                     (default: current directory)
+#   shell             Shell in the container: bash | zsh | ash | fish
+#                     (default: DEFAULT_SHELL from config)
+#   home-directory    Host directory mounted as /home/build
+#                     (default: none; also settable via BUILD_HOME)
 #
-# Beispiele:
+# Examples:
 #   ./start.sh ~/src zsh ~/lmndev-home
 #   BUILD_HOME=~/lmndev-home ./start.sh ~/src
 #
@@ -26,10 +26,10 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WORKSPACE="${1:-$PWD}"
 WORKSPACE="$(realpath "$WORKSPACE")"
 
-# Shell: Argument hat Vorrang vor Umgebungsvariable, diese vor config-Default
+# Shell: argument takes precedence over env var, env var over config default
 SHELL_OVERRIDE="${2:-${DEFAULT_SHELL}}"
 
-# Home-Volume: Argument hat Vorrang vor Umgebungsvariable BUILD_HOME
+# Home volume: argument takes precedence over BUILD_HOME env var
 HOME_VOLUME="${3:-${BUILD_HOME:-}}"
 if [ -n "${HOME_VOLUME}" ]; then
     HOME_VOLUME="$(realpath "${HOME_VOLUME}")"
@@ -44,7 +44,7 @@ if [ ! -d "$WORKSPACE" ]; then
     exit 1
 fi
 
-# Prüfen ob Image vorhanden ist
+# Check if image is available
 if ! docker image inspect "${IMAGE_NAME}:latest" >/dev/null 2>&1; then
     echo "FEHLER: Image '${IMAGE_NAME}:latest' nicht gefunden."
     echo "       Bitte zuerst ./build.sh ausführen."

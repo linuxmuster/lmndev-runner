@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Build-Skript für linuxmuster-fileserver
+# Build script for linuxmuster-fileserver
 # thomas@linuxmuster.net
 
 source /opt/lmndev/build/common.sh

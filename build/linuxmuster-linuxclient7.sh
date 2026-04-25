@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Build-Skript für linuxmuster-linuxclient7
+# Build script for linuxmuster-linuxclient7
 # thomas@linuxmuster.net
 
 source /opt/lmndev/build/common.sh

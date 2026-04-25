@@ -1,11 +1,11 @@
 #!/bin/bash
 #
-# Sammelt Build-Abhängigkeiten aller konfigurierten Projekte und
-# lädt das neueste linuxmuster-common Release herunter.
+# Collects build dependencies for all configured projects and
+# downloads the latest linuxmuster-common release.
 #
-# Ausgabe:
-#   deps.txt                 - deduplizierte Build-Deps aller Projekte
-#   linuxmuster-common.deb   - neuestes Release-Paket
+# Output:
+#   deps.txt                 - deduplicated build deps of all projects
+#   linuxmuster-common.deb   - latest release package
 #
 # thomas@linuxmuster.net
 # 20260425
@@ -20,7 +20,7 @@ CONTROL_BASE_URL="https://raw.githubusercontent.com/${GITHUB_ORG}"
 TMPDIR_WORK="$(mktemp -d)"
 trap "rm -rf $TMPDIR_WORK" EXIT
 
-# Build-Depends aller Projekte sammeln
+# Collect Build-Depends of all projects
 echo "--- Sammle Build-Abhängigkeiten ..."
 > "$TMPDIR_WORK/all_deps.txt"
 
@@ -54,8 +54,8 @@ for project in $PROJECTS; do
     }' "$ctrl_file" >> "$TMPDIR_WORK/all_deps.txt"
 done
 
-# Paketliste normalisieren: Version-Constraints entfernen, deduplizieren,
-# linuxmuster-Pakete ausschließen (werden separat installiert)
+# Normalise package list: strip version constraints, deduplicate,
+# exclude linuxmuster-* packages (installed separately)
 cat "$TMPDIR_WORK/all_deps.txt" \
     | sed 's/([^)]*)//g' \
     | tr ',' '\n' \
@@ -68,7 +68,7 @@ cat "$TMPDIR_WORK/all_deps.txt" \
 
 echo "  -> $(wc -l < "$SCRIPT_DIR/deps.txt") eindeutige Build-Abhängigkeiten."
 
-# Neuestes linuxmuster-common Release ermitteln und herunterladen
+# Determine and download the latest linuxmuster-common release
 echo ""
 echo "--- Hole neuestes ${COMMON_REPO} Release ..."
 RELEASE_API="https://api.github.com/repos/${GITHUB_ORG}/${COMMON_REPO}/releases/latest"
@@ -81,7 +81,7 @@ DEB_URL="$(python3 - "$RELEASE_JSON" <<'EOF'
 import json, sys
 data = json.load(open(sys.argv[1]))
 assets = data.get("assets", [])
-# bevorzuge _all.deb, dann beliebiges .deb
+# prefer _all.deb, fall back to any .deb
 for suffix in ("_all.deb", ".deb"):
     hits = [a["browser_download_url"] for a in assets if a["name"].endswith(suffix)]
     if hits:
