@@ -2,14 +2,17 @@
 #
 # Startet den lmndev-runner Container interaktiv.
 #
-# Verwendung: ./start.sh [quellverzeichnis] [shell]
+# Verwendung: ./start.sh [quellverzeichnis] [shell] [homeverzeichnis]
 #   quellverzeichnis  Verzeichnis, das als /workspace eingebunden wird
 #                     (Standard: aktuelles Verzeichnis)
 #   shell             Shell im Container: bash | zsh | ash | fish
 #                     (Standard: DEFAULT_SHELL aus config)
+#   homeverzeichnis   Host-Verzeichnis, das als /home/build eingebunden wird
+#                     (Standard: keines; auch per BUILD_HOME setzbar)
 #
-# Die Shell kann auch per Umgebungsvariable gesetzt werden:
-#   DEFAULT_SHELL=zsh ./start.sh
+# Beispiele:
+#   ./start.sh ~/src zsh ~/lmndev-home
+#   BUILD_HOME=~/lmndev-home ./start.sh ~/src
 #
 # thomas@linuxmuster.net
 # 20260425
@@ -25,6 +28,16 @@ WORKSPACE="$(realpath "$WORKSPACE")"
 
 # Shell: Argument hat Vorrang vor Umgebungsvariable, diese vor config-Default
 SHELL_OVERRIDE="${2:-${DEFAULT_SHELL}}"
+
+# Home-Volume: Argument hat Vorrang vor Umgebungsvariable BUILD_HOME
+HOME_VOLUME="${3:-${BUILD_HOME:-}}"
+if [ -n "${HOME_VOLUME}" ]; then
+    HOME_VOLUME="$(realpath "${HOME_VOLUME}")"
+    if [ ! -d "${HOME_VOLUME}" ]; then
+        echo "FEHLER: Homeverzeichnis nicht gefunden: ${HOME_VOLUME}"
+        exit 1
+    fi
+fi
 
 if [ ! -d "$WORKSPACE" ]; then
     echo "FEHLER: Verzeichnis nicht gefunden: $WORKSPACE"
@@ -42,7 +55,11 @@ echo "Starte ${IMAGE_NAME} ..."
 echo "  Workspace: ${WORKSPACE} -> /workspace"
 echo "  Shell:     ${SHELL_OVERRIDE}"
 echo "  User:      ${MY_USER} (${MY_UID}:${MY_GID})"
+[ -n "${HOME_VOLUME}" ] && echo "  Home:      ${HOME_VOLUME} -> /home/${MY_USER}"
 echo ""
+
+HOME_MOUNT=""
+[ -n "${HOME_VOLUME}" ] && HOME_MOUNT="-v ${HOME_VOLUME}:/home/${MY_USER}"
 
 docker run -it --rm \
     --name "${IMAGE_NAME}" \
@@ -51,5 +68,6 @@ docker run -it --rm \
     -e DEFAULT_SHELL="${SHELL_OVERRIDE}" \
     -v /etc/localtime:/etc/localtime:ro \
     -v "${WORKSPACE}:/workspace" \
+    ${HOME_MOUNT} \
     -w /workspace \
     "${IMAGE_NAME}:latest"
