@@ -48,10 +48,13 @@ fi
 
 # Docker Image bauen
 echo "--- Baue Docker Image: ${IMAGE_NAME} ..."
+EXTRA_PACKAGES_ARG=""
+[ -n "${EXTRA_PACKAGES}" ] && EXTRA_PACKAGES_ARG="--build-arg EXTRA_PACKAGES=${EXTRA_PACKAGES}"
+
 docker build \
     --build-arg UBUNTU_VERSION="${UBUNTU_TAG}" \
     --build-arg DEFAULT_SHELL="${DEFAULT_SHELL}" \
-    --build-arg EXTRA_PACKAGES="${EXTRA_PACKAGES}" \
+    ${EXTRA_PACKAGES_ARG} \
     --build-arg MY_USER="${MY_USER}" \
     --build-arg MY_UID="${MY_UID}" \
     --build-arg MY_GID="${MY_GID}" \
