@@ -1,0 +1,369 @@
+# lmndev-runner
+
+Docker-basierte Build-Umgebung für [linuxmuster.net](https://linuxmuster.net) Debian-Pakete.
+
+Das Image kann sowohl als Container in einem **GitHub Actions Workflow** als auch als
+**lokales Buildsystem** auf einem Linux-Rechner eingesetzt werden.
+
+---
+
+## Inhaltsverzeichnis
+
+1. [Voraussetzungen](#voraussetzungen)
+2. [Verzeichnisstruktur](#verzeichnisstruktur)
+3. [Konfiguration](#konfiguration)
+4. [Image bauen](#image-bauen)
+5. [Lokale Nutzung](#lokale-nutzung)
+6. [Nutzung als GitHub Actions Runner](#nutzung-als-github-actions-runner)
+7. [Release-Workflows](#release-workflows)
+8. [Pro-Projekt-Buildskripte](#pro-projekt-buildskripte)
+9. [Image veröffentlichen (GHCR)](#image-veröffentlichen-ghcr)
+
+---
+
+## Voraussetzungen
+
+Für den **lokalen Betrieb** werden benötigt:
+
+- Docker
+- `bash`, `curl`, `python3` (für `collect-deps.sh` und `build.sh`)
+- Internetzugang (GitHub API, Ubuntu-Paketquellen)
+
+Für den **GitHub Actions Betrieb** sind keine lokalen Voraussetzungen nötig — das
+Image wird von der GHCR bezogen.
+
+---
+
+## Verzeichnisstruktur
+
+```
+lmndev-runner/
+├── config                        # Zentrale Konfiguration
+├── Dockerfile                    # Image-Definition
+├── build.sh                      # Lokaler Image-Build
+├── collect-deps.sh               # Sammelt Build-Abhängigkeiten, lädt linuxmuster-common
+├── start.sh                      # Startet Container interaktiv
+├── build/                        # Pro-Projekt-Buildskripte (im Image unter /opt/lmndev/build/)
+│   ├── common.sh                 # Gemeinsame Build-Funktionen
+│   ├── linuxmuster-api.sh
+│   ├── linuxmuster-base7.sh
+│   ├── linuxmuster-cli7.sh
+│   ├── linuxmuster-common.sh
+│   ├── linuxmuster-fileserver.sh
+│   ├── linuxmuster-linbo7.sh
+│   ├── linuxmuster-linbo-gui.sh
+│   ├── linuxmuster-linuxclient7.sh
+│   ├── linuxmuster-prepare.sh
+│   ├── linuxmuster-tools.sh
+│   ├── linuxmuster-webui7.sh
+│   └── sophomorix4.sh
+├── workflows/                    # Beispiel-Release-Workflows für Projekt-Repositories
+│   ├── linuxmuster-api.release.yml
+│   ├── linuxmuster-base7.release.yml
+│   └── ...                       # je ein .release.yml pro Projekt
+└── .github/workflows/
+    └── build-push.yml            # Baut und pusht das Image selbst zu GHCR
+```
+
+---
+
+## Konfiguration
+
+Alle Einstellungen befinden sich in der Datei `config`. Sie wird von `build.sh`,
+`collect-deps.sh` und `start.sh` eingelesen.
+
+```sh
+# Ubuntu-Version des Basis-Images
+UBUNTU_VERSION="26.04"
+UBUNTU_FALLBACK="24.04"   # Fallback, wenn die primäre Version nicht verfügbar ist
+
+# Docker Image-Namen
+IMAGE_NAME="lmndev-runner"
+GHCR_IMAGE="ghcr.io/linuxmuster/lmndev-runner"
+
+# Standard-Shell im Container: bash | zsh | ash | fish
+DEFAULT_SHELL="bash"
+
+# Zusätzliche Pakete nur für die lokale Nutzung (für GitHub Actions leer lassen)
+EXTRA_PACKAGES=""
+
+# Build-User im Container
+MY_USER="build"
+MY_UID="1000"
+MY_GID="1001"
+
+# Unterstützte Projekte (leerzeichen-getrennt)
+PROJECTS="linuxmuster-api linuxmuster-base7 ..."
+```
+
+### Konfigurierbare Parameter im Überblick
+
+| Parameter | Beschreibung | Standard |
+|---|---|---|
+| `UBUNTU_VERSION` | Ubuntu-Basisversion | `26.04` |
+| `UBUNTU_FALLBACK` | Fallback-Version | `24.04` |
+| `DEFAULT_SHELL` | Shell im Container | `bash` |
+| `EXTRA_PACKAGES` | Zusätzliche lokale Pakete | *(leer)* |
+| `MY_UID` / `MY_GID` | UID/GID des Build-Users | `1000` / `1001` |
+| `PROJECTS` | Zu unterstützende Projekte | alle 12 Projekte |
+
+### Shell-Optionen
+
+| Wert | Paket | Shell-Pfad |
+|---|---|---|
+| `bash` | `bash` | `/bin/bash` |
+| `zsh` | `zsh` | `/bin/zsh` |
+| `ash` | `busybox` | `/bin/ash` |
+| `fish` | `fish` | `/usr/bin/fish` |
+
+### Projekte anpassen
+
+Sollen nur bestimmte Projekte unterstützt werden, `PROJECTS` in `config` entsprechend
+kürzen. Die Build-Abhängigkeiten werden dann nur für die gelisteten Projekte gesammelt,
+was die Image-Größe reduziert.
+
+---
+
+## Image bauen
+
+### 1. Build-Abhängigkeiten sammeln und Image bauen
+
+```sh
+./build.sh
+```
+
+Dieser Befehl führt automatisch folgende Schritte aus:
+
+1. **Ubuntu-Version prüfen** — falls `ubuntu:26.04` nicht verfügbar ist, wird auf
+   `ubuntu:24.04` zurückgefallen.
+2. **`collect-deps.sh` aufrufen** — holt für jedes konfigurierte Projekt die Datei
+   `debian/control` von GitHub und extrahiert alle `Build-Depends`-Felder. Die
+   deduplizierte Paketliste wird in `deps.txt` geschrieben.
+3. **Neuestes `linuxmuster-common` herunterladen** — das aktuellste `.deb`-Paket wird
+   über die GitHub Releases API ermittelt und lokal gespeichert.
+4. **`docker build` ausführen** — das Image wird mit den konfigurierten Build-Argumenten
+   gebaut. Die temporären Dateien (`deps.txt`, `linuxmuster-common.deb`) werden danach
+   automatisch gelöscht.
+
+### 2. Nur Abhängigkeiten neu sammeln, Image ohne neuen Download bauen
+
+Wenn `deps.txt` und `linuxmuster-common.deb` bereits vorhanden sind (z. B. nach einem
+fehlgeschlagenen Build), kann der Download-Schritt übersprungen werden:
+
+```sh
+./build.sh --no-collect
+```
+
+### Wie `collect-deps.sh` funktioniert
+
+Das Skript lädt für jedes Projekt in `PROJECTS` die Datei `debian/control` direkt von
+GitHub:
+
+```
+https://raw.githubusercontent.com/linuxmuster/PROJEKT/main/debian/control
+```
+
+Aus dem `Build-Depends`-Feld werden alle Paketnamen extrahiert. Dabei werden:
+- Versionsbeschränkungen (z. B. `debhelper (>= 10)`) entfernt
+- Alternativen (`paket-a | paket-b`) auf die erste Option reduziert
+- `linuxmuster-*`-Pakete ausgeschlossen (werden separat installiert)
+- Duplikate entfernt
+
+Das Paket `linuxmuster-common` wird separat über die GitHub Releases API bezogen und
+mit `gdebi` installiert, um Abhängigkeiten automatisch aufzulösen.
+
+---
+
+## Lokale Nutzung
+
+### Container interaktiv starten
+
+```sh
+./start.sh [verzeichnis]
+```
+
+Das angegebene Verzeichnis (Standard: aktuelles Verzeichnis) wird als `/workspace`
+in den Container eingebunden. Die konfigurierte Shell startet automatisch.
+
+**Beispiel:** Quellcode von `linuxmuster-base7` bauen:
+
+```sh
+cd ~/src/linuxmuster-base7
+/pfad/zu/lmndev-runner/start.sh .
+# Im Container:
+linuxmuster-base7.sh
+```
+
+### Paket in einem einzigen Befehl bauen
+
+```sh
+docker run --rm \
+  -v "$PWD:/workspace" \
+  -w /workspace \
+  lmndev-runner:latest \
+  /opt/lmndev/build/linuxmuster-base7.sh
+```
+
+### Ausgabeverzeichnis festlegen
+
+Über die Umgebungsvariable `OUTPUT_DIR` werden die erzeugten `.deb`-Dateien in ein
+bestimmtes Verzeichnis verschoben:
+
+```sh
+docker run --rm \
+  -v "$PWD:/workspace" \
+  -v "$HOME/packages:/output" \
+  -w /workspace \
+  -e OUTPUT_DIR=/output \
+  lmndev-runner:latest \
+  /opt/lmndev/build/linuxmuster-base7.sh
+```
+
+---
+
+## Nutzung als GitHub Actions Runner
+
+Das Image kann in jedem GitHub Actions Workflow als Job-Container eingesetzt werden.
+Alle Build-Abhängigkeiten der unterstützten Projekte sind bereits im Image enthalten.
+
+```yaml
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/linuxmuster/lmndev-runner:latest
+      options: --user root
+
+    steps:
+      - uses: actions/checkout@v4
+      - run: /opt/lmndev/build/linuxmuster-base7.sh
+        env:
+          OUTPUT_DIR: ${{ github.workspace }}/packages
+```
+
+Die Buildskripte befinden sich im Container unter `/opt/lmndev/build/` und sind
+über `$PATH` direkt aufrufbar.
+
+---
+
+## Release-Workflows
+
+Für jedes unterstützte Projekt liegt im Verzeichnis `workflows/` eine fertige
+Beispieldatei `PROJEKT.release.yml`. Diese kann direkt in das jeweilige
+Projekt-Repository kopiert und als GitHub Actions Release-Workflow verwendet werden.
+
+### Verwendung
+
+1. Die passende Datei aus `workflows/` in das Projekt-Repository kopieren:
+
+   ```sh
+   cp workflows/linuxmuster-base7.release.yml \
+      ~/src/linuxmuster-base7/.github/workflows/release.yml
+   ```
+
+2. Im Projekt-Repository drei Secrets hinterlegen
+   (`Settings → Secrets and variables → Actions`):
+
+   | Secret | Beschreibung |
+   |---|---|
+   | `REPO_HOST` | Hostname des APT-Repository-Servers |
+   | `REPO_USER` | SSH-Benutzername auf dem Server |
+   | `REPO_SSH_KEY` | Privater SSH-Schlüssel (ohne Passphrase) |
+
+3. Einen Release-Tag setzen — der Workflow startet automatisch:
+
+   ```sh
+   git tag v7.3.5-0
+   git push origin v7.3.5-0
+   ```
+
+### Ablauf des Release-Workflows
+
+Der Workflow besteht aus drei sequenziellen Jobs:
+
+```
+build ──→ release ──→ publish
+```
+
+| Job | Beschreibung |
+|---|---|
+| **build** | Baut das Paket im `lmndev-runner`-Container. Version und Distribution werden automatisch aus der ersten Zeile von `debian/changelog` gelesen (z. B. `linuxmuster-base7 (7.3.5-0) lmn73; urgency=medium`). |
+| **release** | Erstellt einen GitHub Release mit den erzeugten `.deb`-Dateien. |
+| **publish** | Überträgt die Pakete per SSH auf den APT-Repository-Server und aktualisiert den Repository-Index (`repo-update lmn73` bzw. `repo-update lmn74`). |
+
+Die Ziel-Distribution (`lmn73` oder `lmn74`) wird dabei **automatisch** aus
+`debian/changelog` ermittelt — es ist keine manuelle Auswahl nötig.
+
+### Tag-Format
+
+Der Workflow reagiert auf Tags, die dem Muster `v[0-9]*` entsprechen, also z. B.:
+
+```
+v7.3.5-0
+v7.4.0-1
+```
+
+---
+
+## Pro-Projekt-Buildskripte
+
+Jedes Projekt hat ein eigenes Buildskript unter `build/PROJEKT.sh`. Im Container sind
+diese unter `/opt/lmndev/build/` installiert und direkt per Name aufrufbar.
+
+Alle Skripte verwenden die gemeinsame Funktion `build_package()` aus `build/common.sh`.
+
+### Umgebungsvariablen
+
+| Variable | Beschreibung | Standard |
+|---|---|---|
+| `WORKSPACE` | Quellverzeichnis | `$GITHUB_WORKSPACE` oder aktuelles Verzeichnis |
+| `OUTPUT_DIR` | Zielverzeichnis für `.deb`-Dateien | *(nicht gesetzt, Dateien bleiben im Parent-Verzeichnis)* |
+| `BUILD_FLAGS` | Zusätzliche `dpkg-buildpackage`-Flags | *(leer)* |
+| `CCACHE_DIR` | ccache-Verzeichnis | `/tmp/ccache` |
+
+`ccache` wird automatisch aktiviert, wenn es im Container verfügbar ist.
+
+### Sonderfall `linuxmuster-linbo7`
+
+Der Linbo-Build ist sehr ressourcenintensiv (Kernel, Netzwerktreiber, Busybox). Das
+Skript `build/linuxmuster-linbo7.sh` setzt automatisch:
+
+```sh
+MAKEFLAGS="-j$(nproc)"
+DEB_BUILD_OPTIONS="parallel=$(nproc)"
+```
+
+---
+
+## Image veröffentlichen (GHCR)
+
+Das enthaltene Workflow `.github/workflows/build-push.yml` baut das Image bei jedem
+Push auf `main` automatisch und pusht es zu:
+
+```
+ghcr.io/linuxmuster/lmndev-runner:latest
+```
+
+### Voraussetzungen im lmndev-runner-Repository
+
+Im Repository unter `Settings → Actions → General` muss gesetzt sein:
+
+> **Workflow permissions:** Read and write permissions
+
+Damit kann der Workflow das Image in die GitHub Container Registry schreiben.
+
+### Manueller Build und Push
+
+```sh
+# Lokal bauen
+./build.sh
+
+# Manuell pushen (nach gh auth login oder docker login ghcr.io)
+docker push ghcr.io/linuxmuster/lmndev-runner:latest
+```
+
+---
+
+## Lizenz
+
+Dieses Projekt ist Teil der [linuxmuster.net](https://linuxmuster.net) Entwicklungsumgebung.
