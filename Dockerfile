@@ -8,7 +8,8 @@ ARG UBUNTU_VERSION=26.04
 FROM ubuntu:${UBUNTU_VERSION}
 
 ARG DEFAULT_SHELL=bash
-ARG EXTRA_PACKAGES=""
+ARG EXTRA_PACKAGES="openssh-client iputils-ping net-tools wget bash bash-completion zsh \
+    zsh-autosuggestions zsh-syntax-highlighting ccache distcc curl dpkg-dev debdelta sudo vim git"
 ARG MY_USER=build
 ARG MY_UID=1000
 ARG MY_GID=1000
@@ -76,7 +77,7 @@ RUN case "${DEFAULT_SHELL}" in \
     esac && \
     useradd -s "${SHELL_BIN}" \
         -c 'lmndev build user' \
-        -d /home/${MY_USER} -M \
+        -d /home/${MY_USER} -m \
         -u ${MY_UID} -g ${MY_USER} -G sudo ${MY_USER}
 RUN echo "${MY_USER} ALL=NOPASSWD: ALL" > /etc/sudoers.d/${MY_USER} && \
     chmod 400 /etc/sudoers.d/${MY_USER}
