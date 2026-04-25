@@ -29,24 +29,8 @@ install_missing_deps() {
     dpkg-checkbuilddeps 2>/dev/null && return 0
 
     echo "--- Fehlende Build-Abhängigkeiten werden nachinstalliert ..."
-    local missing
-    missing="$(dpkg-checkbuilddeps 2>&1 \
-        | sed 's/.*Unmet build dependencies: //' \
-        | sed 's/([^)]*)//g' \
-        | tr ' ' '\n' \
-        | grep -v '^$' \
-        | sort -u \
-        | tr '\n' ' ')"
-
-    if [ -z "$missing" ]; then
-        return 0
-    fi
-
-    echo "    Pakete: ${missing}"
     sudo apt-get update -qq
-    # shellcheck disable=SC2086
-    sudo DEBIAN_FRONTEND=noninteractive apt-get \
-        -o "Dpkg::Options::=--force-confold" -y install $missing
+    sudo DEBIAN_FRONTEND=noninteractive apt-get build-dep -y .
 }
 
 # Debian-Paket bauen
