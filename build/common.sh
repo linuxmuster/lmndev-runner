@@ -87,7 +87,7 @@ build_package() {
 
     install_missing_deps
 
-    dpkg-buildpackage -us -uc -b -tc ${BUILD_FLAGS}
+    dpkg-buildpackage -us -uc -tc ${BUILD_FLAGS}
 
     echo "=== ${pkg} (${version}) erfolgreich gebaut ==="
 
