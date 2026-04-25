@@ -90,7 +90,7 @@ EXTRA_PACKAGES=""
 # Build-User im Container
 MY_USER="build"
 MY_UID="1000"
-MY_GID="1001"
+MY_GID="1000"
 
 # Unterstützte Projekte (leerzeichen-getrennt)
 PROJECTS="linuxmuster-api linuxmuster-base7 ..."
@@ -104,7 +104,7 @@ PROJECTS="linuxmuster-api linuxmuster-base7 ..."
 | `UBUNTU_FALLBACK` | Fallback-Version | `24.04` |
 | `DEFAULT_SHELL` | Shell im Container | `bash` |
 | `EXTRA_PACKAGES` | Zusätzliche lokale Pakete | *(leer)* |
-| `MY_UID` / `MY_GID` | UID/GID des Build-Users | `1000` / `1001` |
+| `MY_UID` / `MY_GID` | UID/GID des Build-Users | `1000` / `1000` |
 | `PROJECTS` | Zu unterstützende Projekte | alle 12 Projekte |
 
 ### Shell-Optionen

@@ -23,7 +23,7 @@ EXTRA_PACKAGES=""
 # Build-User im Container
 MY_USER="build"
 MY_UID="1000"
-MY_GID="1001"
+MY_GID="1000"
 
 # GitHub-Organisation und Common-Repository
 GITHUB_ORG="linuxmuster"

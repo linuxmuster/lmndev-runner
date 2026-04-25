@@ -90,7 +90,7 @@ EXTRA_PACKAGES=""
 # Build user in the container
 MY_USER="build"
 MY_UID="1000"
-MY_GID="1001"
+MY_GID="1000"
 
 # Supported projects (space-separated)
 PROJECTS="linuxmuster-api linuxmuster-base7 ..."
@@ -104,7 +104,7 @@ PROJECTS="linuxmuster-api linuxmuster-base7 ..."
 | `UBUNTU_FALLBACK` | Fallback version | `24.04` |
 | `DEFAULT_SHELL` | Shell in the container | `bash` |
 | `EXTRA_PACKAGES` | Additional local packages | *(empty)* |
-| `MY_UID` / `MY_GID` | UID/GID of the build user | `1000` / `1001` |
+| `MY_UID` / `MY_GID` | UID/GID of the build user | `1000` / `1000` |
 | `PROJECTS` | Projects to support | all 12 projects |
 
 ### Shell Options
