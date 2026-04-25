@@ -50,7 +50,8 @@ collect_output() {
         mv "$f" "$OUTPUT_DIR/"
         count=$((count + 1))
     done < <(find "$parent_dir" -maxdepth 1 \
-        \( -name "*.deb" -o -name "*.changes" -o -name "*.buildinfo" \) \
+        \( -name "*.deb" -o -name "*.dsc" -o -name "*.tar.*" \
+        -o -name "*.changes" -o -name "*.buildinfo" \) \
         2>/dev/null | sort)
 
     if [ "$count" -eq 0 ]; then
