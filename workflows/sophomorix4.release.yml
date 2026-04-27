@@ -11,7 +11,7 @@
 #   REPO_SSH_KEY    GitHub SSH key for the linuxmuster/deb repository
 #
 # thomas@linuxmuster.net
-# 20260425
+# 20260427
 
 name: Release
 
