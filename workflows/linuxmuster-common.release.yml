@@ -1,14 +1,14 @@
-# Release-Workflow für linuxmuster-common
+# Release workflow for linuxmuster-common
 #
-# Verwendung: Diese Datei in das linuxmuster-common-Repository kopieren:
+# Usage: Copy this file into the linuxmuster-common repository:
 #   .github/workflows/release.yml
 #
-# Version und Ziel-Distribution werden automatisch aus der ersten Zeile
-# von debian/changelog gelesen. Beispiel:
+# Version and target distribution are read automatically from the first line
+# of debian/changelog. Example:
 #   linuxmuster-common (7.3.5-0) lmn73; urgency=medium
 #
-# Benötigte Repository-Secrets:
-#   REPO_SSH_KEY    GitHub-SSH-Schlüssel für das linuxmuster/deb-Repository
+# Required repository secrets:
+#   REPO_SSH_KEY    GitHub SSH key for the linuxmuster/deb repository
 #
 # thomas@linuxmuster.net
 # 20260425
@@ -36,18 +36,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Version und Distribution aus debian/changelog lesen
+      - name: Read version and distribution from debian/changelog
         id: meta
         run: |
           echo "version=$(dpkg-parsechangelog -S Version)" >> "$GITHUB_OUTPUT"
           echo "distribution=$(dpkg-parsechangelog -S Distribution)" >> "$GITHUB_OUTPUT"
 
-      - name: Paket bauen
+      - name: Build package
         run: /opt/lmndev/build/linuxmuster-common.sh
         env:
           OUTPUT_DIR: ${{ github.workspace }}/packages
 
-      - name: Pakete als Artefakte speichern
+      - name: Upload packages as artifacts
         uses: actions/upload-artifact@v4
         with:
           name: packages
@@ -60,13 +60,13 @@ jobs:
       contents: write
 
     steps:
-      - name: Pakete herunterladen
+      - name: Download packages
         uses: actions/download-artifact@v4
         with:
           name: packages
           path: packages/
 
-      - name: GitHub Release erstellen
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.build.outputs.version }}
@@ -78,20 +78,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Pakete herunterladen
+      - name: Download packages
         uses: actions/download-artifact@v4
         with:
           name: packages
           path: packages/
 
-      - name: Archiv-Repository klonen
+      - name: Clone archive repository
         uses: actions/checkout@v4
         with:
           repository: linuxmuster/deb
           ssh-key: ${{ secrets.REPO_SSH_KEY }}
           path: deb
 
-      - name: Pakete einstellen und pushen (${{ needs.build.outputs.distribution }})
+      - name: Publish packages (${{ needs.build.outputs.distribution }})
         run: |
           PACKAGE="linuxmuster-common"
           DISTRIBUTION="${{ needs.build.outputs.distribution }}"
