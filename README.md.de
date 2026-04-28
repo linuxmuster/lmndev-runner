@@ -12,7 +12,7 @@ Das Image kann sowohl als Container in einem **GitHub Actions Workflow** als auc
 1. [Voraussetzungen](#voraussetzungen)
 2. [Verzeichnisstruktur](#verzeichnisstruktur)
 3. [Konfiguration](#konfiguration)
-4. [Image bauen](#image-bauen)
+4. [Images bauen](#images-bauen)
 5. [Lokale Nutzung](#lokale-nutzung)
 6. [Nutzung als GitHub Actions Runner](#nutzung-als-github-actions-runner)
 7. [Release-Workflows](#release-workflows)
@@ -36,7 +36,7 @@ Image wird von der GHCR bezogen.
 
 ## Verzeichnisstruktur
 
-```
+```text
 lmndev-runner/
 ├── config                        # Zentrale Konfiguration
 ├── Dockerfile                    # Image-Definition
@@ -73,9 +73,10 @@ Alle Einstellungen befinden sich in der Datei `config`. Sie wird von `build.sh`,
 `collect-deps.sh` und `start.sh` eingelesen.
 
 ```sh
-# Ubuntu-Version des Basis-Images
-UBUNTU_VERSION="26.04"
-UBUNTU_FALLBACK="24.04"   # Fallback, wenn die primäre Version nicht verfügbar ist
+# Ubuntu-Versionen
+UBUNTU_VERSION="26.04"          # primäre Version (bekommt zusätzlich den :latest-Tag)
+UBUNTU_FALLBACK="24.04"         # Fallback, wenn die primäre Version nicht verfügbar ist
+UBUNTU_VERSIONS="24.04 26.04"   # alle unterstützten Versionen (für ./build.sh all)
 
 # Docker Image-Namen
 IMAGE_NAME="lmndev-runner"
@@ -99,9 +100,10 @@ PROJECTS="linuxmuster-api linuxmuster-base7 ..."
 ### Konfigurierbare Parameter im Überblick
 
 | Parameter | Beschreibung | Standard |
-|---|---|---|
-| `UBUNTU_VERSION` | Ubuntu-Basisversion | `26.04` |
-| `UBUNTU_FALLBACK` | Fallback-Version | `24.04` |
+| --- | --- | --- |
+| `UBUNTU_VERSION` | Primäre Ubuntu-Version (bekommt auch den `:latest`-Tag) | `26.04` |
+| `UBUNTU_FALLBACK` | Fallback-Version, wenn primäre nicht verfügbar | `24.04` |
+| `UBUNTU_VERSIONS` | Alle Versionen, die `./build.sh all` baut | `24.04 26.04` |
 | `DEFAULT_SHELL` | Standard-Shell beim Start von `start.sh` | `bash` |
 | `EXTRA_PACKAGES` | Überschreibt die Standard-Extrapakete des Dockerfiles | *(leer = Dockerfile-Standard wird genutzt)* |
 | `MY_UID` / `MY_GID` | UID/GID des Build-Users | `1000` / `1000` |
@@ -111,7 +113,7 @@ PROJECTS="linuxmuster-api linuxmuster-base7 ..."
 
 Das Dockerfile enthält bereits einen sinnvollen Satz an Standard-Extrapaketen:
 
-```
+```text
 openssh-client iputils-ping net-tools wget bash bash-completion zsh
 zsh-autosuggestions zsh-syntax-highlighting ccache distcc curl
 dpkg-dev debdelta sudo vim git
@@ -126,7 +128,7 @@ Alle vier Shells sind **immer** im Image installiert — unabhängig von der Kon
 Die gewünschte Shell wird erst zur Laufzeit ausgewählt.
 
 | Wert | Paket | Shell-Pfad |
-|---|---|---|
+| --- | --- | --- |
 | `bash` | `bash` | `/bin/bash` |
 | `zsh` | `zsh` | `/bin/zsh` |
 | `ash` | `busybox` | `/bin/ash` |
@@ -140,46 +142,66 @@ was die Image-Größe reduziert.
 
 ---
 
-## Image bauen
+## Images bauen
 
-### 1. Build-Abhängigkeiten sammeln und Image bauen
+Images werden pro Ubuntu-Version gebaut und entsprechend getaggt: `:24.04`, `:26.04`.
+Die primäre Version (aktuell `26.04`) erhält zusätzlich den Tag `:latest`.
+
+### Primäre Version bauen (Standard)
 
 ```sh
 ./build.sh
 ```
 
-Dieser Befehl führt automatisch folgende Schritte aus:
+### Bestimmte Version bauen
 
-1. **Ubuntu-Version prüfen** — falls `ubuntu:26.04` nicht verfügbar ist, wird auf
-   `ubuntu:24.04` zurückgefallen.
-2. **`collect-deps.sh` aufrufen** — holt für jedes konfigurierte Projekt die Datei
-   `debian/control` von GitHub und extrahiert alle `Build-Depends`-Felder. Die
-   deduplizierte Paketliste wird in `deps.txt` geschrieben.
-3. **Neuestes `linuxmuster-common` herunterladen** — das aktuellste `.deb`-Paket wird
-   über die GitHub Releases API ermittelt und lokal gespeichert.
-4. **`docker build` ausführen** — das Image wird mit den konfigurierten Build-Argumenten
-   gebaut. Die temporären Dateien (`deps.txt`, `linuxmuster-common.deb`) werden danach
-   automatisch gelöscht.
+```sh
+./build.sh 24.04
+./build.sh 26.04
+```
 
-### 2. Nur Abhängigkeiten neu sammeln, Image ohne neuen Download bauen
+### Alle Versionen auf einmal bauen
+
+```sh
+./build.sh all
+```
+
+`collect-deps.sh` wird dabei nur einmal aufgerufen und das Ergebnis für alle Versionen verwendet.
+
+### Dependency-Sammlung überspringen (vorhandene Dateien verwenden)
 
 Wenn `deps.txt` und `linuxmuster-common.deb` bereits vorhanden sind (z. B. nach einem
 fehlgeschlagenen Build), kann der Download-Schritt übersprungen werden:
 
 ```sh
 ./build.sh --no-collect
+./build.sh --no-collect 24.04
+./build.sh --no-collect all
 ```
+
+### Was `build.sh` ausführt
+
+1. **Zu bauende Versionen ermitteln** anhand des Arguments (`24.04`, `26.04`, `all` oder Standard).
+2. **`collect-deps.sh` aufrufen** — holt für jedes konfigurierte Projekt die Datei
+   `debian/control` von GitHub und extrahiert alle `Build-Depends`-Felder. Die
+   deduplizierte Paketliste wird in `deps.txt` geschrieben.
+3. **Neuestes `linuxmuster-common` herunterladen** — das aktuellste `.deb`-Paket wird
+   über die GitHub Releases API ermittelt und lokal gespeichert.
+4. **`docker build` für jede Version ausführen** — das Image wird als `IMAGE_NAME:VERSION`
+   getaggt (für die primäre Version zusätzlich als `:latest`). Temporäre Dateien werden
+   danach automatisch gelöscht.
 
 ### Wie `collect-deps.sh` funktioniert
 
 Das Skript lädt für jedes Projekt in `PROJECTS` die Datei `debian/control` direkt von
 GitHub:
 
-```
+```text
 https://raw.githubusercontent.com/linuxmuster/PROJEKT/main/debian/control
 ```
 
 Aus dem `Build-Depends`-Feld werden alle Paketnamen extrahiert. Dabei werden:
+
 - Versionsbeschränkungen (z. B. `debhelper (>= 10)`) entfernt
 - Alternativen (`paket-a | paket-b`) auf die erste Option reduziert
 - `linuxmuster-*`-Pakete ausgeschlossen (werden separat installiert)
@@ -195,33 +217,35 @@ mit `gdebi` installiert, um Abhängigkeiten automatisch aufzulösen.
 ### Container interaktiv starten
 
 ```sh
-./start.sh [quellverzeichnis] [shell] [homeverzeichnis]
+./start.sh [quellverzeichnis] [shell] [homeverzeichnis] [ubuntu-version]
 ```
 
 | Argument | Beschreibung | Standard |
-|---|---|---|
+| --- | --- | --- |
 | `quellverzeichnis` | Wird als `/workspace` eingebunden | aktuelles Verzeichnis |
 | `shell` | Shell im Container: `bash`, `zsh`, `ash`, `fish` | `DEFAULT_SHELL` aus `config` |
 | `homeverzeichnis` | Host-Verzeichnis für `/home/build` | keines |
+| `ubuntu-version` | Zu verwendendes Image-Tag: `24.04`, `26.04`, `latest` | `UBUNTU_TAG`-Env-Variable oder `latest` |
 
 Die Shell kann auch über die Umgebungsvariable `DEFAULT_SHELL` gesetzt werden.
 Das Home-Verzeichnis kann alternativ über `BUILD_HOME` übergeben werden.
+Die Ubuntu-Version kann alternativ über die Umgebungsvariable `UBUNTU_TAG` gesetzt werden.
 
 **Beispiele:**
 
 ```sh
-# Einfacher Start mit Standard-Shell
+# Einfacher Start mit Standard-Shell und aktuellem Image
 cd ~/src/linuxmuster-base7
 /pfad/zu/lmndev-runner/start.sh .
 
-# zsh als Shell verwenden
-/pfad/zu/lmndev-runner/start.sh ~/src/linuxmuster-base7 zsh
+# Ubuntu 24.04 Image verwenden
+/pfad/zu/lmndev-runner/start.sh ~/src/linuxmuster-base7 bash "" 24.04
 
-# Mit eigenem Home-Verzeichnis (Shell-Konfiguration, History, …)
-/pfad/zu/lmndev-runner/start.sh ~/src/linuxmuster-base7 zsh ~/lmndev-home
+# Ubuntu-Version per Umgebungsvariable
+UBUNTU_TAG=24.04 /pfad/zu/lmndev-runner/start.sh ~/src/linuxmuster-base7
 
-# Shell per Umgebungsvariable
-DEFAULT_SHELL=fish /pfad/zu/lmndev-runner/start.sh ~/src/linuxmuster-base7
+# Mit eigenem Home-Verzeichnis und bestimmter Ubuntu-Version
+/pfad/zu/lmndev-runner/start.sh ~/src/linuxmuster-base7 zsh ~/lmndev-home 24.04
 
 # Home-Verzeichnis per Umgebungsvariable
 BUILD_HOME=~/lmndev-home /pfad/zu/lmndev-runner/start.sh ~/src/linuxmuster-base7
@@ -235,10 +259,18 @@ linuxmuster-base7.sh
 ### Paket in einem einzigen Befehl bauen
 
 ```sh
+# Standard-Image (latest) verwenden
 docker run --rm \
   -v "$PWD:/workspace" \
   -w /workspace \
   lmndev-runner:latest \
+  /opt/lmndev/build/linuxmuster-base7.sh
+
+# Ubuntu 24.04 Image explizit verwenden
+docker run --rm \
+  -v "$PWD:/workspace" \
+  -w /workspace \
+  lmndev-runner:24.04 \
   /opt/lmndev/build/linuxmuster-base7.sh
 ```
 
@@ -263,6 +295,14 @@ docker run --rm \
 
 Das Image kann in jedem GitHub Actions Workflow als Job-Container eingesetzt werden.
 Alle Build-Abhängigkeiten der unterstützten Projekte sind bereits im Image enthalten.
+
+Die Images sind mit versionsspezifischen Tags verfügbar:
+
+| Tag | Ubuntu-Version | Verwendung |
+| --- | --- | --- |
+| `:latest` | 26.04 (primär) | `lmn74` und neuere Distributionen |
+| `:26.04` | 26.04 | `lmn74` und neuere Distributionen |
+| `:24.04` | 24.04 | `lmn73` und ältere Distributionen |
 
 ```yaml
 jobs:
@@ -303,7 +343,7 @@ Projekt-Repository kopiert und als GitHub Actions Release-Workflow verwendet wer
    (`Settings → Secrets and variables → Actions`):
 
    | Secret | Beschreibung |
-   |---|---|
+   | --- | --- |
    | `REPO_HOST` | Hostname des APT-Repository-Servers |
    | `REPO_USER` | SSH-Benutzername auf dem Server |
    | `REPO_SSH_KEY` | Privater SSH-Schlüssel (ohne Passphrase) |
@@ -317,26 +357,27 @@ Projekt-Repository kopiert und als GitHub Actions Release-Workflow verwendet wer
 
 ### Ablauf des Release-Workflows
 
-Der Workflow besteht aus drei sequenziellen Jobs:
+Der Workflow besteht aus vier sequenziellen Jobs:
 
-```
-build ──→ release ──→ publish
+```text
+resolve ──→ build ──→ release ──→ publish
 ```
 
 | Job | Beschreibung |
-|---|---|
-| **build** | Baut das Paket im `lmndev-runner`-Container. Version und Distribution werden automatisch aus der ersten Zeile von `debian/changelog` gelesen (z. B. `linuxmuster-base7 (7.3.5-0) lmn73; urgency=medium`). |
+| --- | --- |
+| **resolve** | Liest die Ziel-Distribution aus `debian/changelog` und wählt das passende Runner-Image: `lmn74` und höher → `:latest` (Ubuntu 26.04), alle anderen → `:24.04`. |
+| **build** | Baut das Paket im von `resolve` gewählten `lmndev-runner`-Container. Version und Distribution werden automatisch aus der ersten Zeile von `debian/changelog` gelesen (z. B. `linuxmuster-base7 (7.3.5-0) lmn73; urgency=medium`). |
 | **release** | Erstellt einen GitHub Release mit den erzeugten `.deb`-Dateien. |
 | **publish** | Überträgt die Pakete per SSH auf den APT-Repository-Server und aktualisiert den Repository-Index (`repo-update lmn73` bzw. `repo-update lmn74`). |
 
-Die Ziel-Distribution (`lmn73` oder `lmn74`) wird dabei **automatisch** aus
-`debian/changelog` ermittelt — es ist keine manuelle Auswahl nötig.
+Die Ziel-Distribution (`lmn73` oder `lmn74`) und das Runner-Image werden dabei
+**automatisch** aus `debian/changelog` ermittelt — es ist keine manuelle Auswahl nötig.
 
 ### Tag-Format
 
 Der Workflow reagiert auf Tags, die dem Muster `v[0-9]*` entsprechen, also z. B.:
 
-```
+```text
 v7.3.5-0
 v7.4.0-1
 ```
@@ -353,7 +394,7 @@ Alle Skripte verwenden die gemeinsame Funktion `build_package()` aus `build/comm
 ### Umgebungsvariablen
 
 | Variable | Beschreibung | Standard |
-|---|---|---|
+| --- | --- | --- |
 | `WORKSPACE` | Quellverzeichnis | `$GITHUB_WORKSPACE` oder aktuelles Verzeichnis |
 | `OUTPUT_DIR` | Zielverzeichnis für `.deb`-Dateien | *(nicht gesetzt, Dateien bleiben im Parent-Verzeichnis)* |
 | `BUILD_FLAGS` | Zusätzliche `dpkg-buildpackage`-Flags | *(leer)* |
@@ -375,11 +416,13 @@ DEB_BUILD_OPTIONS="parallel=$(nproc)"
 
 ## Image veröffentlichen (GHCR)
 
-Das enthaltene Workflow `.github/workflows/build-push.yml` baut das Image bei jedem
-Push auf `main` automatisch und pusht es zu:
+Das enthaltene Workflow `.github/workflows/build-push.yml` baut bei jedem Push auf
+`main` automatisch alle Images und pusht sie zu GHCR:
 
-```
-ghcr.io/linuxmuster/lmndev-runner:latest
+```text
+ghcr.io/linuxmuster/lmndev-runner:24.04
+ghcr.io/linuxmuster/lmndev-runner:26.04
+ghcr.io/linuxmuster/lmndev-runner:latest   ← Alias für die primäre Version (26.04)
 ```
 
 ### Voraussetzungen im lmndev-runner-Repository
@@ -393,10 +436,12 @@ Damit kann der Workflow das Image in die GitHub Container Registry schreiben.
 ### Manueller Build und Push
 
 ```sh
-# Lokal bauen
-./build.sh
+# Alle Versionen lokal bauen
+./build.sh all
 
 # Manuell pushen (nach gh auth login oder docker login ghcr.io)
+docker push ghcr.io/linuxmuster/lmndev-runner:24.04
+docker push ghcr.io/linuxmuster/lmndev-runner:26.04
 docker push ghcr.io/linuxmuster/lmndev-runner:latest
 ```
 

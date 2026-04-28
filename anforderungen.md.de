@@ -1,9 +1,13 @@
 # lmndev runner
+
 ## Bau-Umgebung für linuxmuster.net Debian-Pakete
 
-- Es soll ein Dockerimage auf Basis von Ubuntu (aktuell 26.04) erstellt werden.
-- Die Ubuntuversion soll konfigurierbar sein
-- Die Bau-Abhängigkeiten von Projekten unter https://github.com/orgs/linuxmuster/ sollen
+- Es sollen Dockerimages auf Basis von Ubuntu erstellt werden – standardmäßig für Ubuntu 24.04
+  und 26.04 parallel.
+- Die unterstützten Ubuntu-Versionen sollen konfigurierbar sein. Das primäre Image (aktuell
+  26.04) erhält zusätzlich den Tag `:latest`; jede Version wird separat als `:<version>`
+  getaggt (z.B. `:24.04`, `:26.04`).
+- Die Bau-Abhängigkeiten von Projekten unter <https://github.com/orgs/linuxmuster/> sollen
   erfüllt sein.
 - Die unterstützten Projekte sollen konfigurierbar sein. Standardmäßig sind dies:
   - linuxmuster-api
@@ -19,7 +23,7 @@
   - linuxmuster-webui7
   - sophomorix4
 - Als zusätzliche Abhängigkeit soll das aktuellste Release des linuxmuster-common-Pakets
-  (siehe https://github.com/linuxmuster/linuxmuster-common/releases) integriert sein.
+  (siehe <https://github.com/linuxmuster/linuxmuster-common/releases>) integriert sein.
 - Das Dockerimage soll sowohl als runner in einem Github-Workflow als auch lokal als
   Dockerimage auf einem Linuxsystem nutzbar sein.
 - Für die Nutzung als lokales Buildsystem sollen zusätzlich zu installierende Pakete

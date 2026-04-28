@@ -2,20 +2,22 @@
 #
 # Starts the lmndev-runner container interactively.
 #
-# Usage: ./start.sh [source-directory] [shell] [home-directory]
+# Usage: ./start.sh [source-directory] [shell] [home-directory] [ubuntu-version]
 #   source-directory  Directory mounted as /workspace
 #                     (default: current directory)
 #   shell             Shell in the container: bash | zsh | ash | fish
 #                     (default: DEFAULT_SHELL from config)
 #   home-directory    Host directory mounted as /home/build
 #                     (default: none; also settable via BUILD_HOME)
+#   ubuntu-version    Image tag to use: 24.04 | 26.04 | latest
+#                     (default: UBUNTU_TAG env var or "latest")
 #
 # Examples:
-#   ./start.sh ~/src zsh ~/lmndev-home
-#   BUILD_HOME=~/lmndev-home ./start.sh ~/src
+#   ./start.sh ~/src zsh ~/lmndev-home 24.04
+#   UBUNTU_TAG=24.04 BUILD_HOME=~/lmndev-home ./start.sh ~/src
 #
 # thomas@linuxmuster.net
-# 20260425
+# 20260427
 #
 
 set -e
@@ -31,6 +33,9 @@ SHELL_OVERRIDE="${2:-${DEFAULT_SHELL}}"
 
 # Home volume: argument takes precedence over BUILD_HOME env var
 HOME_VOLUME="${3:-${BUILD_HOME:-}}"
+
+# Image tag: argument > UBUNTU_TAG env var > "latest"
+IMAGE_TAG="${4:-${UBUNTU_TAG:-latest}}"
 if [ -n "${HOME_VOLUME}" ]; then
     HOME_VOLUME="$(realpath "${HOME_VOLUME}")"
     if [ ! -d "${HOME_VOLUME}" ]; then
@@ -45,13 +50,13 @@ if [ ! -d "$WORKSPACE" ]; then
 fi
 
 # Check if image is available
-if ! docker image inspect "${IMAGE_NAME}:latest" >/dev/null 2>&1; then
-    echo "FEHLER: Image '${IMAGE_NAME}:latest' nicht gefunden."
-    echo "       Bitte zuerst ./build.sh ausführen."
+if ! docker image inspect "${IMAGE_NAME}:${IMAGE_TAG}" >/dev/null 2>&1; then
+    echo "FEHLER: Image '${IMAGE_NAME}:${IMAGE_TAG}' nicht gefunden."
+    echo "       Bitte zuerst ./build.sh [${IMAGE_TAG}] ausführen."
     exit 1
 fi
 
-echo "Starting ${IMAGE_NAME} ..."
+echo "Starting ${IMAGE_NAME}:${IMAGE_TAG} ..."
 echo "  Workspace: ${WORKSPACE} -> /workspace"
 echo "  Shell:     ${SHELL_OVERRIDE}"
 echo "  User:      ${MY_USER} (${MY_UID}:${MY_GID})"
@@ -80,4 +85,4 @@ docker run -it --rm \
     ${HOME_MOUNT} \
     ${DISTCC_MOUNT} \
     -w /workspace \
-    "${IMAGE_NAME}:latest"
+    "${IMAGE_NAME}:${IMAGE_TAG}"

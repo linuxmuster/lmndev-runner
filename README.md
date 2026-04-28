@@ -73,9 +73,10 @@ All settings are located in the `config` file. It is sourced by `build.sh`,
 `collect-deps.sh`, and `start.sh`.
 
 ```sh
-# Ubuntu version of the base image
-UBUNTU_VERSION="26.04"
-UBUNTU_FALLBACK="24.04"   # fallback if the primary version is not available
+# Ubuntu versions
+UBUNTU_VERSION="26.04"          # primary version (also receives the :latest tag)
+UBUNTU_FALLBACK="24.04"         # fallback if the primary version is not available
+UBUNTU_VERSIONS="24.04 26.04"   # all supported versions (used by ./build.sh all)
 
 # Docker image names
 IMAGE_NAME="lmndev-runner"
@@ -100,8 +101,9 @@ PROJECTS="linuxmuster-api linuxmuster-base7 ..."
 
 | Parameter | Description | Default |
 | --- | --- | --- |
-| `UBUNTU_VERSION` | Ubuntu base version | `26.04` |
-| `UBUNTU_FALLBACK` | Fallback version | `24.04` |
+| `UBUNTU_VERSION` | Primary Ubuntu version (also tagged as `:latest`) | `26.04` |
+| `UBUNTU_FALLBACK` | Fallback version if primary is unavailable | `24.04` |
+| `UBUNTU_VERSIONS` | All versions built by `./build.sh all` | `24.04 26.04` |
 | `DEFAULT_SHELL` | Default shell when starting `start.sh` | `bash` |
 | `EXTRA_PACKAGES` | Overrides the Dockerfile's default extra packages | *(empty = Dockerfile defaults are used)* |
 | `MY_UID` / `MY_GID` | UID/GID of the build user | `1000` / `1000` |
@@ -142,32 +144,52 @@ reducing the image size.
 
 ## Building the Image
 
-### 1. Collect build dependencies and build the image
+Images are built per Ubuntu version and tagged accordingly: `:24.04`, `:26.04`.
+The primary version (currently `26.04`) additionally receives the `:latest` tag.
+
+### Build a single version (default: primary version from config)
 
 ```sh
 ./build.sh
 ```
 
-This command automatically performs the following steps:
+### Build a specific version
 
-1. **Check the Ubuntu version** — if `ubuntu:26.04` is not available, it falls back
-   to `ubuntu:24.04`.
-2. **Call `collect-deps.sh`** — fetches the `debian/control` file for each configured
-   project from GitHub and extracts all `Build-Depends` fields. The deduplicated
-   package list is written to `deps.txt`.
-3. **Download the latest `linuxmuster-common`** — the most recent `.deb` package is
-   determined via the GitHub Releases API and saved locally.
-4. **Run `docker build`** — the image is built with the configured build arguments.
-   The temporary files (`deps.txt`, `linuxmuster-common.deb`) are deleted afterwards.
+```sh
+./build.sh 24.04
+./build.sh 26.04
+```
 
-### 2. Skip dependency collection and build from existing files
+### Build all versions at once
+
+```sh
+./build.sh all
+```
+
+`collect-deps.sh` is called only once and its output is shared across all versions.
+
+### Skip dependency collection (reuse existing files)
 
 If `deps.txt` and `linuxmuster-common.deb` are already present (e.g. after a failed
 build), the download step can be skipped:
 
 ```sh
 ./build.sh --no-collect
+./build.sh --no-collect 24.04
+./build.sh --no-collect all
 ```
+
+### What `build.sh` does
+
+1. **Determine versions to build** from the argument (`24.04`, `26.04`, `all`, or default).
+2. **Call `collect-deps.sh`** — fetches the `debian/control` file for each configured
+   project from GitHub and extracts all `Build-Depends` fields. The deduplicated
+   package list is written to `deps.txt`.
+3. **Download the latest `linuxmuster-common`** — the most recent `.deb` package is
+   determined via the GitHub Releases API and saved locally.
+4. **Run `docker build` for each version** — the image is tagged as `IMAGE_NAME:VERSION`
+   (and additionally as `:latest` for the primary version). Temporary files are deleted
+   afterwards.
 
 ### How `collect-deps.sh` works
 
@@ -195,7 +217,7 @@ and installed with `gdebi` to automatically resolve its dependencies.
 ### Start the container interactively
 
 ```sh
-./start.sh [source-directory] [shell] [home-directory]
+./start.sh [source-directory] [shell] [home-directory] [ubuntu-version]
 ```
 
 | Argument | Description | Default |
@@ -203,25 +225,27 @@ and installed with `gdebi` to automatically resolve its dependencies.
 | `source-directory` | Mounted as `/workspace` | current directory |
 | `shell` | Shell in the container: `bash`, `zsh`, `ash`, `fish` | `DEFAULT_SHELL` from `config` |
 | `home-directory` | Host directory mounted as `/home/build` | none |
+| `ubuntu-version` | Image tag to use: `24.04`, `26.04`, `latest` | `UBUNTU_TAG` env var or `latest` |
 
 The shell can also be set via the `DEFAULT_SHELL` environment variable.
 The home directory can alternatively be passed via `BUILD_HOME`.
+The Ubuntu version can alternatively be passed via the `UBUNTU_TAG` environment variable.
 
 **Examples:**
 
 ```sh
-# Simple start with default shell
+# Simple start with default shell and latest image
 cd ~/src/linuxmuster-base7
 /path/to/lmndev-runner/start.sh .
 
-# Use zsh as shell
-/path/to/lmndev-runner/start.sh ~/src/linuxmuster-base7 zsh
+# Use the Ubuntu 24.04 image
+/path/to/lmndev-runner/start.sh ~/src/linuxmuster-base7 bash "" 24.04
 
-# With a custom home directory (shell config, history, …)
-/path/to/lmndev-runner/start.sh ~/src/linuxmuster-base7 zsh ~/lmndev-home
+# Ubuntu version via environment variable
+UBUNTU_TAG=24.04 /path/to/lmndev-runner/start.sh ~/src/linuxmuster-base7
 
-# Shell via environment variable
-DEFAULT_SHELL=fish /path/to/lmndev-runner/start.sh ~/src/linuxmuster-base7
+# With a custom home directory and specific Ubuntu version
+/path/to/lmndev-runner/start.sh ~/src/linuxmuster-base7 zsh ~/lmndev-home 24.04
 
 # Home directory via environment variable
 BUILD_HOME=~/lmndev-home /path/to/lmndev-runner/start.sh ~/src/linuxmuster-base7
@@ -235,10 +259,18 @@ linuxmuster-base7.sh
 ### Build a package in a single command
 
 ```sh
+# Use the default (latest) image
 docker run --rm \
   -v "$PWD:/workspace" \
   -w /workspace \
   lmndev-runner:latest \
+  /opt/lmndev/build/linuxmuster-base7.sh
+
+# Use the Ubuntu 24.04 image explicitly
+docker run --rm \
+  -v "$PWD:/workspace" \
+  -w /workspace \
+  lmndev-runner:24.04 \
   /opt/lmndev/build/linuxmuster-base7.sh
 ```
 
@@ -263,6 +295,14 @@ docker run --rm \
 
 The image can be used as a job container in any GitHub Actions workflow. All build
 dependencies of the supported projects are already included in the image.
+
+Images are available with version-specific tags:
+
+| Tag | Ubuntu version | Use for |
+| --- | --- | --- |
+| `:latest` | 26.04 (primary) | `lmn74` and newer distributions |
+| `:26.04` | 26.04 | `lmn74` and newer distributions |
+| `:24.04` | 24.04 | `lmn73` and older distributions |
 
 ```yaml
 jobs:
@@ -317,20 +357,21 @@ project repository and used as a GitHub Actions release workflow.
 
 ### Release workflow steps
 
-The workflow consists of three sequential jobs:
+The workflow consists of four sequential jobs:
 
 ```text
-build ──→ release ──→ publish
+resolve ──→ build ──→ release ──→ publish
 ```
 
 | Job | Description |
 | --- | --- |
-| **build** | Builds the package inside the `lmndev-runner` container. Version and distribution are read automatically from the first line of `debian/changelog` (e.g. `linuxmuster-base7 (7.3.5-0) lmn73; urgency=medium`). |
+| **resolve** | Reads the target distribution from `debian/changelog` and selects the matching runner image: `lmn74` and higher → `:latest` (Ubuntu 26.04), all others → `:24.04`. |
+| **build** | Builds the package inside the `lmndev-runner` container selected by `resolve`. Version and distribution are read automatically from the first line of `debian/changelog` (e.g. `linuxmuster-base7 (7.3.5-0) lmn73; urgency=medium`). |
 | **release** | Creates a GitHub Release with the generated `.deb` files. |
 | **publish** | Transfers the packages to the APT repository server via SSH and updates the repository index (`repo-update lmn73` or `repo-update lmn74`). |
 
-The target distribution (`lmn73` or `lmn74`) is determined **automatically** from
-`debian/changelog` — no manual selection is required.
+The target distribution (`lmn73` or `lmn74`) and the runner image are determined
+**automatically** from `debian/changelog` — no manual selection is required.
 
 ### Tag format
 
@@ -375,11 +416,13 @@ DEB_BUILD_OPTIONS="parallel=$(nproc)"
 
 ## Publishing the Image (GHCR)
 
-The included workflow `.github/workflows/build-push.yml` automatically builds the
-image on every push to `main` and pushes it to:
+The included workflow `.github/workflows/build-push.yml` automatically builds all
+images on every push to `main` and pushes them to GHCR:
 
 ```text
-ghcr.io/linuxmuster/lmndev-runner:latest
+ghcr.io/linuxmuster/lmndev-runner:24.04
+ghcr.io/linuxmuster/lmndev-runner:26.04
+ghcr.io/linuxmuster/lmndev-runner:latest   ← alias for the primary version (26.04)
 ```
 
 ### Repository requirements
@@ -394,10 +437,12 @@ This allows the workflow to write the image to the GitHub Container Registry.
 ### Manual build and push
 
 ```sh
-# Build locally
-./build.sh
+# Build all versions locally
+./build.sh all
 
 # Push manually (after gh auth login or docker login ghcr.io)
+docker push ghcr.io/linuxmuster/lmndev-runner:24.04
+docker push ghcr.io/linuxmuster/lmndev-runner:26.04
 docker push ghcr.io/linuxmuster/lmndev-runner:latest
 ```
 

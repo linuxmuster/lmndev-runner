@@ -6,9 +6,10 @@
 # 20260425
 #
 
-# Ubuntu-Version (Fallback wenn die primäre Version nicht verfügbar ist)
-UBUNTU_VERSION="26.04"
-UBUNTU_FALLBACK="24.04"
+# Ubuntu-Versionen
+UBUNTU_VERSION="26.04"          # primäre Version (bekommt zusätzlich :latest-Tag)
+UBUNTU_FALLBACK="24.04"         # Fallback wenn primäre nicht verfügbar
+UBUNTU_VERSIONS="24.04 26.04"   # alle unterstützten Versionen (für --all)
 
 # Image-Name und GHCR-Pfad
 IMAGE_NAME="lmndev-runner"
