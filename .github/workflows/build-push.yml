@@ -1,10 +1,12 @@
-# lmndev-runner: Docker Image bauen und zu GHCR pushen
+# lmndev-runner: Build and push Docker images to GHCR
 #
-# Wird ausgelöst bei Push auf main (außer Dokumentationsänderungen)
-# oder manuell via workflow_dispatch.
+# Triggered on push to main (excluding documentation changes)
+# or manually via workflow_dispatch.
+# Builds one image per Ubuntu version defined in the matrix;
+# the primary version (currently 26.04) also receives the :latest tag.
 #
 # thomas@linuxmuster.net
-# 20260425
+# 20260427
 
 name: Build and Push Docker Image
 
@@ -29,46 +31,61 @@ jobs:
       contents: read
       packages: write
 
+    strategy:
+      matrix:
+        ubuntu_version: ["24.04", "26.04"]
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Ubuntu-Version prüfen
+      - name: Check Ubuntu version availability
         id: ubuntu
         run: |
           . ./config
-          if docker pull "ubuntu:${UBUNTU_VERSION}" >/dev/null 2>&1; then
-            echo "tag=${UBUNTU_VERSION}" >> "$GITHUB_OUTPUT"
+          VERSION="${{ matrix.ubuntu_version }}"
+          if docker pull "ubuntu:${VERSION}" >/dev/null 2>&1; then
+            echo "tag=${VERSION}" >> "$GITHUB_OUTPUT"
           else
-            echo "WARNUNG: ubuntu:${UBUNTU_VERSION} nicht verfügbar, nutze ${UBUNTU_FALLBACK}"
+            echo "WARNING: ubuntu:${VERSION} not available, using fallback: ${UBUNTU_FALLBACK}"
             echo "tag=${UBUNTU_FALLBACK}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Build-Abhängigkeiten sammeln und linuxmuster-common herunterladen
+      - name: Determine image tags
+        id: tags
+        run: |
+          . ./config
+          VERSION="${{ matrix.ubuntu_version }}"
+          TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}"
+          if [ "${VERSION}" = "${UBUNTU_VERSION}" ]; then
+            TAGS="${TAGS},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+          fi
+          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
+
+      - name: Collect build dependencies and download linuxmuster-common
         run: bash collect-deps.sh
 
-      - name: Anmeldung bei GHCR
+      - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Docker Buildx einrichten
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Docker Image bauen und pushen
+      - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          tags: ${{ steps.tags.outputs.tags }}
           build-args: |
             UBUNTU_VERSION=${{ steps.ubuntu.outputs.tag }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=ubuntu-${{ matrix.ubuntu_version }}
+          cache-to: type=gha,mode=max,scope=ubuntu-${{ matrix.ubuntu_version }}
 
-      - name: Temporäre Dateien entfernen
+      - name: Remove temporary files
         if: always()
         run: rm -f deps.txt linuxmuster-common.deb
