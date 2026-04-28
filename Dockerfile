@@ -22,6 +22,11 @@ ENV MY_GID=${MY_GID}
 # Vorbereitete Dateien aus collect-deps.sh
 COPY deps.txt linuxmuster-common.deb /tmp/
 
+# Enable deb-src entries (required for apt-get source / dpkg-source)
+RUN if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then \
+        sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources; \
+    fi
+
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get \
         -o "Dpkg::Options::=--force-confold" -y dist-upgrade
