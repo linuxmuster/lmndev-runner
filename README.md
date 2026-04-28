@@ -258,6 +258,9 @@ linuxmuster-base7.sh
 
 ### Build a package in a single command
 
+Note: If there is an executable script `buildpackage.sh` in the root directory of
+the package source, then this script will be used to build the package.
+
 ```sh
 # Use the default (latest) image
 docker run --rm \

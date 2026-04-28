@@ -258,6 +258,9 @@ linuxmuster-base7.sh
 
 ### Paket in einem einzigen Befehl bauen
 
+Hinweis: Falls im Wurzelverzeichnis der Paketquelle ein ausführbares Skript `buildpackage.sh`
+liegt, wird dieses zum Paketbau verwendet. 
+
 ```sh
 # Standard-Image (latest) verwenden
 docker run --rm \
