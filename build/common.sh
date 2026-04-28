@@ -8,7 +8,7 @@
 #   BUILD_FLAGS  Additional dpkg-buildpackage flags
 #
 # thomas@linuxmuster.net
-# 20260425
+# 20260428
 #
 
 set -e
@@ -87,7 +87,13 @@ build_package() {
 
     install_missing_deps
 
-    dpkg-buildpackage -us -uc -tc ${BUILD_FLAGS}
+    if [ -x ./buildpackage.sh ]; then
+        echo "--- Verwende benutzerdefinierte buildpackage.sh im Quellverzeichnis"
+        ./buildpackage.sh
+    else
+        echo "--- Verwende Standard dpkg-buildpackage"
+        dpkg-buildpackage -us -uc -tc ${BUILD_FLAGS}
+    fi
 
     echo "=== ${pkg} (${version}) erfolgreich gebaut ==="
 
