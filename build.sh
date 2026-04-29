@@ -56,8 +56,8 @@ else
     [ -f linuxmuster-common.deb ] || { echo "ERROR: linuxmuster-common.deb not found."; exit 1; }
 fi
 
-EXTRA_PACKAGES_ARG=""
-[ -n "${EXTRA_PACKAGES}" ] && EXTRA_PACKAGES_ARG="--build-arg EXTRA_PACKAGES=${EXTRA_PACKAGES}"
+EXTRA_PACKAGES_ARGS=()
+[ -n "${EXTRA_PACKAGES}" ] && EXTRA_PACKAGES_ARGS=(--build-arg "EXTRA_PACKAGES=${EXTRA_PACKAGES}")
 
 for VERSION in $VERSIONS; do
     # Check availability, fall back to UBUNTU_FALLBACK if needed
@@ -68,21 +68,21 @@ for VERSION in $VERSIONS; do
     fi
 
     # Version-specific tags
-    EXTRA_TAGS="-t ${IMAGE_NAME}:${VERSION} -t ${GHCR_IMAGE}:${VERSION}"
+    EXTRA_TAGS=(-t "${IMAGE_NAME}:${VERSION}" -t "${GHCR_IMAGE}:${VERSION}")
     # Primary version also gets :latest
     if [ "$VERSION" = "$UBUNTU_VERSION" ]; then
-        EXTRA_TAGS="${EXTRA_TAGS} -t ${IMAGE_NAME}:latest -t ${GHCR_IMAGE}:latest"
+        EXTRA_TAGS+=(-t "${IMAGE_NAME}:latest" -t "${GHCR_IMAGE}:latest")
     fi
 
     echo "--- Building Docker image for Ubuntu ${VERSION} ..."
     docker build \
         --build-arg UBUNTU_VERSION="${UBUNTU_TAG}" \
         --build-arg DEFAULT_SHELL="${DEFAULT_SHELL}" \
-        ${EXTRA_PACKAGES_ARG} \
+        "${EXTRA_PACKAGES_ARGS[@]}" \
         --build-arg MY_USER="${MY_USER}" \
         --build-arg MY_UID="${MY_UID}" \
         --build-arg MY_GID="${MY_GID}" \
-        ${EXTRA_TAGS} \
+        "${EXTRA_TAGS[@]}" \
         .
     echo "--- Done: ${IMAGE_NAME}:${VERSION}"
     echo ""
