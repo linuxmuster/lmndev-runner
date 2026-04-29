@@ -2,14 +2,15 @@
 # Dockerfile für die linuxmuster.net Paket-Build-Umgebung
 #
 # thomas@linuxmuster.net
-# 20260425
+# 20260429
 
 ARG UBUNTU_VERSION=26.04
 FROM ubuntu:${UBUNTU_VERSION}
 
 ARG DEFAULT_SHELL=bash
 ARG EXTRA_PACKAGES="openssh-client iputils-ping net-tools wget bash bash-completion zsh \
-    zsh-autosuggestions zsh-syntax-highlighting ccache distcc curl dpkg-dev debdelta sudo vim git"
+    zsh-autosuggestions zsh-syntax-highlighting ccache distcc curl dpkg-dev debdelta \
+    sudo vim git linux-image-generic linux-headers-generic r8125-dkms r8168-dkms zstd"
 ARG MY_USER=build
 ARG MY_UID=1000
 ARG MY_GID=1000
