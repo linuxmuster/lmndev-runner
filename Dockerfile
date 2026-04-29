@@ -36,7 +36,13 @@ RUN apt-get update && \
 RUN DEBIAN_FRONTEND=noninteractive apt-get \
         -o "Dpkg::Options::=--force-confold" -y install \
     bash bash-completion ccache curl debhelper dpkg-dev fakeroot gdebi-core \
-    git gnupg gpg sudo tzdata wget
+    gcc git gnupg gpg sudo tzdata wget
+
+# gen_init_cpio aus dem Linux-Kernel-Source kompilieren
+RUN curl -fsSL https://raw.githubusercontent.com/torvalds/linux/master/usr/gen_init_cpio.c \
+        -o /tmp/gen_init_cpio.c && \
+    gcc -O2 -o /usr/local/bin/gen_init_cpio /tmp/gen_init_cpio.c && \
+    rm /tmp/gen_init_cpio.c
 
 # Projekt-Build-Abhängigkeiten (aus deps.txt, von collect-deps.sh generiert).
 # Erst alle auf einmal versuchen; schlägt ein Paket fehl (z.B. nicht in Ubuntu
