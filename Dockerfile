@@ -39,27 +39,36 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get \
     bash bash-completion ccache curl debhelper dpkg-dev fakeroot gdebi-core \
     gcc git gnupg gpg sudo tzdata wget
 
-# gen_init_cpio aus dem Linux-Kernel-Source kompilieren
-RUN curl -fsSL https://raw.githubusercontent.com/torvalds/linux/master/usr/gen_init_cpio.c \
-        -o /tmp/gen_init_cpio.c && \
-    gcc -O2 -o /usr/local/bin/gen_init_cpio /tmp/gen_init_cpio.c && \
-    rm /tmp/gen_init_cpio.c
+# Schnellsten Ubuntu-Mirror ermitteln und Paketlisten aktualisieren
+RUN BEST=$( \
+        { curl -sS --max-time 10 "https://mirrors.ubuntu.com/mirrors.txt" 2>/dev/null || true; } | \
+        head -10 | \
+        while IFS= read -r m; do \
+            t=$(curl -o /dev/null -s -w '%{time_connect}' --max-time 1 "${m}" 2>/dev/null) && \
+            printf '%s %s\n' "$t" "$m" || true; \
+        done | sort -n | awk 'NR==1{print $2}') && \
+    if [ -n "$BEST" ]; then \
+        echo "Schnellster Mirror: $BEST"; \
+        for f in /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list; do \
+            [ -f "$f" ] && sed -Ei "s|http://archive.ubuntu.com/ubuntu/?|${BEST%/}|g" "$f" || true; \
+        done && \
+        apt-get update -q; \
+    fi
 
-# Projekt-Build-Abhängigkeiten (aus deps.txt, von collect-deps.sh generiert).
-# Erst alle auf einmal versuchen; schlägt ein Paket fehl (z.B. nicht in Ubuntu
-# verfügbar), Einzelinstallation mit Warnung — so werden alle verfügbaren Pakete
-# sicher installiert.
-RUN DEBIAN_FRONTEND=noninteractive apt-get \
-        -o "Dpkg::Options::=--force-confold" -y install \
-        $(cat /tmp/deps.txt) \
-    || { \
-        echo "--- Einzelinstallation (nicht verfügbare Pakete werden übersprungen) ---"; \
-        for pkg in $(cat /tmp/deps.txt); do \
-            DEBIAN_FRONTEND=noninteractive apt-get \
-                -o "Dpkg::Options::=--force-confold" -y install "$pkg" \
-            || echo "WARNUNG: $pkg nicht verfügbar, übersprungen."; \
-        done; \
-    }
+# Projekt-Build-Abhängigkeiten: nicht verfügbare Pakete nach /tmp/fails.txt schreiben,
+# verfügbare in einem Schritt bulk-installieren
+RUN apt-get install -sy $(cat /tmp/deps.txt) 2>&1 \
+        | grep -E "^E: (Unable to locate package|Package '.*' has no installation candidate)" \
+        | sed -E "s/^E: Unable to locate package //; \
+                  s/^E: Package '(.*)' has no installation candidate.*/\1/" \
+        > /tmp/fails.txt || true; \
+    if [ -s /tmp/fails.txt ]; then \
+        echo "--- Nicht verfügbare Pakete (übersprungen):"; \
+        cat /tmp/fails.txt; \
+    fi; \
+    PKGS=$(grep -vxFf /tmp/fails.txt /tmp/deps.txt | tr '\n' ' '); \
+    DEBIAN_FRONTEND=noninteractive apt-get \
+        -o "Dpkg::Options::=--force-confold" -y install $PKGS
 
 # linuxmuster-common aus dem neuesten GitHub Release
 RUN DEBIAN_FRONTEND=noninteractive gdebi -n /tmp/linuxmuster-common.deb
@@ -77,7 +86,7 @@ RUN if [ -n "${EXTRA_PACKAGES}" ]; then \
     fi
 
 RUN apt-get clean && apt-get -y autoremove && \
-    rm -rf /var/lib/apt/lists/* /tmp/deps.txt /tmp/linuxmuster-common.deb
+    rm -rf /var/lib/apt/lists/* /tmp/deps.txt /tmp/fails.txt /tmp/linuxmuster-common.deb
 
 # Build-User anlegen
 RUN userdel -f ubuntu 2>/dev/null || true && \
