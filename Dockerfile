@@ -56,7 +56,7 @@ RUN BEST=$( \
     fi
 
 # Projekt-Build-Abhängigkeiten: nicht verfügbare Pakete nach /tmp/fails.txt schreiben,
-# verfügbare in einem Schritt bulk-installieren
+# verfügbare in einem Schritt bulk-installieren; bei Fehlschlag Einzelinstallation
 RUN apt-get install -sy $(cat /tmp/deps.txt) 2>&1 \
         | grep -E "^E: (Unable to locate package|Package '.*' has no installation candidate)" \
         | sed -E "s/^E: Unable to locate package //; \
@@ -67,8 +67,18 @@ RUN apt-get install -sy $(cat /tmp/deps.txt) 2>&1 \
         cat /tmp/fails.txt; \
     fi; \
     PKGS=$(grep -vxFf /tmp/fails.txt /tmp/deps.txt | tr '\n' ' '); \
-    DEBIAN_FRONTEND=noninteractive apt-get \
-        -o "Dpkg::Options::=--force-confold" -y install $PKGS
+    if [ -n "$(echo $PKGS)" ]; then \
+        DEBIAN_FRONTEND=noninteractive apt-get \
+            -o "Dpkg::Options::=--force-confold" -y install $PKGS \
+        || { \
+            echo "--- Bulk-Install fehlgeschlagen, Einzelinstallation:"; \
+            for pkg in $PKGS; do \
+                DEBIAN_FRONTEND=noninteractive apt-get \
+                    -o "Dpkg::Options::=--force-confold" -y install "$pkg" \
+                || echo "WARNUNG: $pkg nicht verfügbar, übersprungen."; \
+            done; \
+        }; \
+    fi
 
 # linuxmuster-common aus dem neuesten GitHub Release
 RUN DEBIAN_FRONTEND=noninteractive gdebi -n /tmp/linuxmuster-common.deb
