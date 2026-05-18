@@ -222,7 +222,7 @@ and installed with `gdebi` to automatically resolve its dependencies.
 
 | Argument | Description | Default |
 | --- | --- | --- |
-| `source-directory` | Mounted as `/workspace` | current directory |
+| `source-directory` | Mounted as `/workspace/build` | current directory |
 | `shell` | Shell in the container: `bash`, `zsh`, `ash`, `fish` | `DEFAULT_SHELL` from `config` |
 | `home-directory` | Host directory mounted as `/home/build` | none |
 | `ubuntu-version` | Image tag to use: `24.04`, `26.04`, `latest` | `UBUNTU_TAG` env var or `latest` |
@@ -262,31 +262,43 @@ Note: If there is an executable script `buildpackage.sh` in the root directory o
 the package source, then this script will be used to build the package.
 
 ```sh
-# Use the default (latest) image
+# Use the default (latest) image — packages land in ./output/ on the host
+mkdir -p output
 docker run --rm \
-  -v "$PWD:/workspace" \
-  -w /workspace \
+  -v "$PWD:/workspace/build" \
+  -v "$PWD/output:/workspace/output" \
   lmndev-runner:latest \
   /opt/lmndev/build/linuxmuster-base7.sh
 
 # Use the Ubuntu 24.04 image explicitly
+mkdir -p output
 docker run --rm \
-  -v "$PWD:/workspace" \
-  -w /workspace \
+  -v "$PWD:/workspace/build" \
+  -v "$PWD/output:/workspace/output" \
   lmndev-runner:24.04 \
   /opt/lmndev/build/linuxmuster-base7.sh
 ```
 
 ### Specifying an output directory
 
-The environment variable `OUTPUT_DIR` causes the generated `.deb` files to be moved
-to a specific directory:
+Generated `.deb` files are written to `/workspace/output` inside the container by
+default. Mount a host directory there to retrieve the packages after the run:
+
+```sh
+mkdir -p "$HOME/packages"
+docker run --rm \
+  -v "$PWD:/workspace/build" \
+  -v "$HOME/packages:/workspace/output" \
+  lmndev-runner:latest \
+  /opt/lmndev/build/linuxmuster-base7.sh
+```
+
+To use a completely different path, override `OUTPUT_DIR` explicitly:
 
 ```sh
 docker run --rm \
-  -v "$PWD:/workspace" \
+  -v "$PWD:/workspace/build" \
   -v "$HOME/packages:/output" \
-  -w /workspace \
   -e OUTPUT_DIR=/output \
   lmndev-runner:latest \
   /opt/lmndev/build/linuxmuster-base7.sh
@@ -313,13 +325,14 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/linuxmuster/lmndev-runner:latest
-      options: --user root
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: build
       - run: /opt/lmndev/build/linuxmuster-base7.sh
         env:
-          OUTPUT_DIR: ${{ github.workspace }}/packages
+          OUTPUT_DIR: ${{ github.workspace }}/output
 ```
 
 The build scripts are installed in the container at `/opt/lmndev/build/` and can be
@@ -399,7 +412,7 @@ All scripts use the shared `build_package()` function from `build/common.sh`.
 | Variable | Description | Default |
 | --- | --- | --- |
 | `WORKSPACE` | Source directory | `$GITHUB_WORKSPACE` or current directory |
-| `OUTPUT_DIR` | Target directory for `.deb` files | *(unset, files remain in parent directory)* |
+| `OUTPUT_DIR` | Target directory for `.deb` files | `/workspace/output` |
 | `BUILD_FLAGS` | Additional `dpkg-buildpackage` flags | *(empty)* |
 | `CCACHE_DIR` | ccache directory | `/tmp/ccache` |
 

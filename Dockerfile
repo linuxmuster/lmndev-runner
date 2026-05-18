@@ -2,7 +2,7 @@
 # Dockerfile für die linuxmuster.net Paket-Build-Umgebung
 #
 # thomas@linuxmuster.net
-# 20260513
+# 20260518
 
 ARG UBUNTU_VERSION=26.04
 FROM ubuntu:${UBUNTU_VERSION}
@@ -119,5 +119,10 @@ COPY build/ /opt/lmndev/build/
 RUN chmod +x /opt/lmndev/build/*.sh
 
 ENV PATH="/opt/lmndev/build:${PATH}"
+
+RUN mkdir -p /workspace/build /workspace/output && \
+    chown -R ${MY_UID}:${MY_GID} /workspace
+WORKDIR /workspace/build
+USER ${MY_USER}
 
 CMD ["/bin/sh", "-c", "exec /bin/${DEFAULT_SHELL:-bash}"]

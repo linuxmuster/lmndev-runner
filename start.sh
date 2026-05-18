@@ -57,7 +57,7 @@ if ! docker image inspect "${IMAGE_NAME}:${IMAGE_TAG}" >/dev/null 2>&1; then
 fi
 
 echo "Starting ${IMAGE_NAME}:${IMAGE_TAG} ..."
-echo "  Workspace: ${WORKSPACE} -> /workspace"
+echo "  Workspace: ${WORKSPACE} -> /workspace/build"
 echo "  Shell:     ${SHELL_OVERRIDE}"
 echo "  User:      ${MY_USER} (${MY_UID}:${MY_GID})"
 [ -n "${HOME_VOLUME}" ] && echo "  Home:      ${HOME_VOLUME} -> /home/${MY_USER}"
@@ -81,8 +81,8 @@ docker run -it --rm \
     -u "${MY_UID}:${MY_GID}" \
     -e DEFAULT_SHELL="${SHELL_OVERRIDE}" \
     -v /etc/localtime:/etc/localtime:ro \
-    -v "${WORKSPACE}:/workspace" \
+    -v "${WORKSPACE}:/workspace/build" \
     ${HOME_MOUNT} \
     ${DISTCC_MOUNT} \
-    -w /workspace \
+    -w /workspace/build \
     "${IMAGE_NAME}:${IMAGE_TAG}"

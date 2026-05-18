@@ -16,13 +16,15 @@ set -e
 # Determine source directory
 get_workspace() {
     if [ -n "$GITHUB_WORKSPACE" ]; then
-        echo "$GITHUB_WORKSPACE"
+        echo "${GITHUB_WORKSPACE}/build"
     elif [ -n "$WORKSPACE" ]; then
         echo "$WORKSPACE"
     else
         pwd
     fi
 }
+
+OUTPUT_DIR="${OUTPUT_DIR:-/workspace/output}"
 
 # Install missing build dependencies for the current debian/control.
 # Called automatically so feature branches with different build deps
