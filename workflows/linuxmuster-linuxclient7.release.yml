@@ -45,6 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ${{ needs.resolve.outputs.image }}
+      options: --user root
 
     outputs:
       version: ${{ steps.meta.outputs.version }}
