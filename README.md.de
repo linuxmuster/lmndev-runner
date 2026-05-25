@@ -42,7 +42,8 @@ lmndev-runner/
 ├── Dockerfile                    # Image-Definition
 ├── build.sh                      # Lokaler Image-Build
 ├── collect-deps.sh               # Sammelt Build-Abhängigkeiten, lädt linuxmuster-common
-├── start.sh                      # Startet Container interaktiv
+├── start.sh                      # Startet Container interaktiv (lokales oder Remote-Image)
+├── ghcr-start.sh                 # Kompatibilitäts-Wrapper: entspricht ./start.sh --remote
 ├── build/                        # Pro-Projekt-Buildskripte (im Image unter /opt/lmndev/build/)
 │   ├── common.sh                 # Gemeinsame Build-Funktionen
 │   ├── linuxmuster-api.sh
@@ -217,11 +218,12 @@ mit `gdebi` installiert, um Abhängigkeiten automatisch aufzulösen.
 ### Container interaktiv starten
 
 ```sh
-./start.sh [quellverzeichnis] [shell] [homeverzeichnis] [ubuntu-version]
+./start.sh [--remote|-r] [quellverzeichnis] [shell] [homeverzeichnis] [ubuntu-version]
 ```
 
-| Argument | Beschreibung | Standard |
+| Argument / Option | Beschreibung | Standard |
 | --- | --- | --- |
+| `--remote`, `-r` | Remote-Image von der GHCR verwenden (`ghcr.io/linuxmuster/lmndev-runner`) statt des lokal gebauten Images. Ist das Image noch nicht lokal vorhanden, wird es automatisch per `docker pull` bezogen. | lokales Image |
 | `quellverzeichnis` | Wird als `/workspace/build` eingebunden | aktuelles Verzeichnis |
 | `shell` | Shell im Container: `bash`, `zsh`, `ash`, `fish` | `DEFAULT_SHELL` aus `config` |
 | `homeverzeichnis` | Host-Verzeichnis für `/home/build` | keines |
@@ -234,11 +236,18 @@ Die Ubuntu-Version kann alternativ über die Umgebungsvariable `UBUNTU_TAG` gese
 **Beispiele:**
 
 ```sh
-# Einfacher Start mit Standard-Shell und aktuellem Image
+# Einfacher Start mit Standard-Shell und lokalem Image
 cd ~/src/linuxmuster-base7
 /pfad/zu/lmndev-runner/start.sh .
 
-# Ubuntu 24.04 Image verwenden
+# Remote-Image von GHCR statt lokalem Image verwenden
+/pfad/zu/lmndev-runner/start.sh --remote ~/src/linuxmuster-base7
+
+# Remote-Image, bestimmte Ubuntu-Version
+/pfad/zu/lmndev-runner/start.sh -r ~/src/linuxmuster-base7 bash "" 24.04
+UBUNTU_TAG=24.04 /pfad/zu/lmndev-runner/start.sh --remote ~/src/linuxmuster-base7
+
+# Ubuntu 24.04 lokales Image verwenden
 /pfad/zu/lmndev-runner/start.sh ~/src/linuxmuster-base7 bash "" 24.04
 
 # Ubuntu-Version per Umgebungsvariable
@@ -250,6 +259,8 @@ UBUNTU_TAG=24.04 /pfad/zu/lmndev-runner/start.sh ~/src/linuxmuster-base7
 # Home-Verzeichnis per Umgebungsvariable
 BUILD_HOME=~/lmndev-home /pfad/zu/lmndev-runner/start.sh ~/src/linuxmuster-base7
 ```
+
+`ghcr-start.sh` ist ein Kompatibilitäts-Wrapper, der intern `./start.sh --remote "$@"` aufruft.
 
 ```sh
 # Im Container:

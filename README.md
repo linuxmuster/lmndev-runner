@@ -42,7 +42,8 @@ lmndev-runner/
 ├── Dockerfile                    # Image definition
 ├── build.sh                      # Local image build
 ├── collect-deps.sh               # Collects build dependencies, downloads linuxmuster-common
-├── start.sh                      # Starts the container interactively
+├── start.sh                      # Starts the container interactively (local or remote image)
+├── ghcr-start.sh                 # Compatibility wrapper: equivalent to ./start.sh --remote
 ├── build/                        # Per-project build scripts (installed in image at /opt/lmndev/build/)
 │   ├── common.sh                 # Shared build functions
 │   ├── linuxmuster-api.sh
@@ -217,11 +218,12 @@ and installed with `gdebi` to automatically resolve its dependencies.
 ### Start the container interactively
 
 ```sh
-./start.sh [source-directory] [shell] [home-directory] [ubuntu-version]
+./start.sh [--remote|-r] [source-directory] [shell] [home-directory] [ubuntu-version]
 ```
 
-| Argument | Description | Default |
+| Argument / Option | Description | Default |
 | --- | --- | --- |
+| `--remote`, `-r` | Use the remote image from GHCR (`ghcr.io/linuxmuster/lmndev-runner`) instead of the locally built image. If the image is not yet cached locally, it is pulled automatically. | local image |
 | `source-directory` | Mounted as `/workspace/build` | current directory |
 | `shell` | Shell in the container: `bash`, `zsh`, `ash`, `fish` | `DEFAULT_SHELL` from `config` |
 | `home-directory` | Host directory mounted as `/home/build` | none |
@@ -234,11 +236,18 @@ The Ubuntu version can alternatively be passed via the `UBUNTU_TAG` environment 
 **Examples:**
 
 ```sh
-# Simple start with default shell and latest image
+# Simple start with default shell and latest local image
 cd ~/src/linuxmuster-base7
 /path/to/lmndev-runner/start.sh .
 
-# Use the Ubuntu 24.04 image
+# Use the remote GHCR image instead of the local one
+/path/to/lmndev-runner/start.sh --remote ~/src/linuxmuster-base7
+
+# Remote image, specific Ubuntu version
+/path/to/lmndev-runner/start.sh -r ~/src/linuxmuster-base7 bash "" 24.04
+UBUNTU_TAG=24.04 /path/to/lmndev-runner/start.sh --remote ~/src/linuxmuster-base7
+
+# Use the Ubuntu 24.04 local image
 /path/to/lmndev-runner/start.sh ~/src/linuxmuster-base7 bash "" 24.04
 
 # Ubuntu version via environment variable
@@ -250,6 +259,8 @@ UBUNTU_TAG=24.04 /path/to/lmndev-runner/start.sh ~/src/linuxmuster-base7
 # Home directory via environment variable
 BUILD_HOME=~/lmndev-home /path/to/lmndev-runner/start.sh ~/src/linuxmuster-base7
 ```
+
+`ghcr-start.sh` is a compatibility wrapper that simply calls `./start.sh --remote "$@"`.
 
 ```sh
 # Inside the container:
