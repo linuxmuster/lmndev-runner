@@ -409,6 +409,23 @@ v7.3.5-0
 v7.4.0-1
 ```
 
+### Optional: Shell Test Harness
+
+Projects that ship a `tests/shell/` harness (POSIX `sh` / busybox `ash` tests;
+see linuxmuster-linbo7's `tests/shell/README.md` for the reference
+implementation) can additionally copy `workflows/shell-tests.yml`:
+
+```sh
+cp workflows/shell-tests.yml \
+   ~/src/linuxmuster-linbo7/.github/workflows/shell-tests.yml
+```
+
+It runs `tests/shell/run.sh` under both shells in the `lmndev-runner`
+container and needs no secrets. On its own it's informational only; to make
+it a hard release gate, add a `test` job that calls it and include it in the
+`build` job's `needs:` — see linuxmuster-linbo7's `release.yml` for the
+wiring.
+
 ---
 
 ## Per-Project Build Scripts

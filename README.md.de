@@ -410,6 +410,24 @@ v7.3.5-0
 v7.4.0-1
 ```
 
+### Optional: Shell-Test-Harness
+
+Projekte, die eine `tests/shell/`-Harness mitbringen (POSIX-`sh`-/Busybox-`ash`-
+Tests; siehe `tests/shell/README.md` von linuxmuster-linbo7 als
+Referenzimplementierung), können zusätzlich `workflows/shell-tests.yml`
+kopieren:
+
+```sh
+cp workflows/shell-tests.yml \
+   ~/src/linuxmuster-linbo7/.github/workflows/shell-tests.yml
+```
+
+Der Workflow führt `tests/shell/run.sh` unter beiden Shells im
+`lmndev-runner`-Container aus und benötigt keine Secrets. Für sich genommen
+ist er nur informativ; um ihn zu einem echten Release-Gate zu machen, einen
+`test`-Job ergänzen, der ihn aufruft, und ihn in den `needs:` des `build`-Jobs
+aufnehmen — siehe `release.yml` von linuxmuster-linbo7 für die Verdrahtung.
+
 ---
 
 ## Pro-Projekt-Buildskripte
