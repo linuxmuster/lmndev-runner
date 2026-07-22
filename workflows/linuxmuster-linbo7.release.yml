@@ -40,11 +40,18 @@ jobs:
             echo "image=ghcr.io/linuxmuster/lmndev-runner:24.04" >> "$GITHUB_OUTPUT"
           fi
 
-  test:
-    uses: ./.github/workflows/shell-tests.yml
+  # Optional: only enable if this project also has a tests/shell/ harness
+  # and workflows/shell-tests.yml has been copied in (see README, "Optional:
+  # Shell Test Harness"). GitHub validates a reusable-workflow reference
+  # unconditionally, even under a false `if:`, so leaving this active
+  # without shell-tests.yml present would break the whole release workflow.
+  # To activate: uncomment the job below, and add ", test" to build's
+  # needs: list.
+  # test:
+  #   uses: ./.github/workflows/shell-tests.yml
 
   build:
-    needs: [resolve, test]
+    needs: resolve # add ", test" here once the test: job above is enabled
     runs-on: ubuntu-latest
     container:
       image: ${{ needs.resolve.outputs.image }}
