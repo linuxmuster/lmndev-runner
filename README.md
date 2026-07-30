@@ -338,7 +338,7 @@ jobs:
       image: ghcr.io/linuxmuster/lmndev-runner:latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: build
       - run: /opt/lmndev/build/linuxmuster-base7.sh

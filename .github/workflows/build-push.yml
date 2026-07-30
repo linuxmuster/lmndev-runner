@@ -6,7 +6,7 @@
 # the primary version (currently 26.04) also receives the :latest tag.
 #
 # thomas@linuxmuster.net
-# 20260427
+# 20260730
 
 name: Build and Push Docker Image
 
@@ -39,7 +39,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Check Ubuntu version availability
         id: ubuntu
