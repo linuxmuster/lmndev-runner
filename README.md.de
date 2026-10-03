@@ -458,6 +458,27 @@ MAKEFLAGS="-j$(nproc)"
 DEB_BUILD_OPTIONS="parallel=$(nproc)"
 ```
 
+#### Vorgebaute Kernel (linbo 4.3)
+
+Branches mit `build/bin/kernel-sync.sh` (linbo 4.3) kompilieren die Kernel nicht bei
+jedem Paketbau. Kernel und Module liegen in `kernel/` und werden mit dem
+historienlosen Branch `kernels-<major.minor>` abgeglichen (siehe linuxmuster-linbo7
+Issue #186):
+
+- Der Job `build` aus `workflows/linuxmuster-linbo7.release.yml` holt vor dem Bau die
+  vorgebauten Kernel; kompiliert wird nur, wenn einer fehlt.
+- Ein manueller Lauf mit dem Input `kernels` führt nur den Job `kernels` aus. Er baut
+  neuere kernel.org-Versionen und pusht sie nach `kernels-<major.minor>`. Lokal
+  anstoßen mit `build/bin/kernel-sync.sh build -w`; das wartet und holt das Ergebnis.
+- Ein manueller Lauf mit abgeschaltetem Input `publish` baut nur das Paket, ohne
+  GitHub-Release und ohne Update von `linuxmuster/deb`.
+- Bei lokalen Builds lässt `BUILDKERNELS=yes` in der Container-Umgebung
+  (`docker run -e BUILDKERNELS=yes ...`) den Bau neuere kernel.org-Versionen
+  kompilieren.
+
+Branches ohne `kernel-sync.sh` (7.4, Kernel aus Ubuntu) überspringen das Holen; der
+Job `kernels` bricht dort mit einem Hinweis ab.
+
 ---
 
 ## Image veröffentlichen (GHCR)

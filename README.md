@@ -456,6 +456,26 @@ MAKEFLAGS="-j$(nproc)"
 DEB_BUILD_OPTIONS="parallel=$(nproc)"
 ```
 
+#### Prebuilt kernels (linbo 4.3)
+
+Branches providing `build/bin/kernel-sync.sh` (linbo 4.3) do not compile the kernels
+on every package build. Kernels and modules are stored in `kernel/` and synced with
+the orphan branch `kernels-<major.minor>` (see linuxmuster-linbo7 issue #186):
+
+- The `build` job of `workflows/linuxmuster-linbo7.release.yml` pulls the prebuilt
+  kernels before building; kernels are only compiled if one is missing.
+- A manual run with input `kernels` only runs the `kernels` job, which builds newer
+  kernel.org versions and pushes them to `kernels-<major.minor>`. Start it locally
+  with `build/bin/kernel-sync.sh build -w`, which waits and pulls the result.
+- A manual run with input `publish` disabled only builds the package, without
+  GitHub release and `linuxmuster/deb` update.
+- For local builds, `BUILDKERNELS=yes` in the container environment
+  (`docker run -e BUILDKERNELS=yes ...`) makes the build compile newer kernel.org
+  versions.
+
+Branches without `kernel-sync.sh` (7.4, kernel from Ubuntu) skip the pull; the
+`kernels` job fails there with a notice.
+
 ---
 
 ## Publishing the Image (GHCR)

@@ -10,16 +10,40 @@
 # Required repository secrets:
 #   REPO_SSH_KEY    GitHub SSH key for the linuxmuster/deb repository
 #
+# Prebuilt kernels (only branches providing build/bin/kernel-sync.sh, i.e.
+# linbo 4.3): the build job pulls them from the orphan branch
+# kernels-<major.minor>, kernels are only compiled if one is missing there.
+# A manual run with "kernels" enabled only runs the kernels job: it builds the
+# kernels and modules if kernel.org has newer versions than the prebuilt ones
+# and pushes the result back to kernels-<major.minor>, if the run's branch is
+# the one the kernels branch belongs to (e.g. 4.3 for kernels-4.3). Start it
+# locally with: build/bin/kernel-sync.sh build [-w]
+# On branches without kernel-sync.sh (7.4, Ubuntu kernel) the pull is skipped
+# and the kernels job fails with a notice.
+#
+# A manual run with "publish" disabled only builds the package and uploads it
+# as workflow artifact, without GitHub release and linuxmuster/deb update.
+#
 # thomas@linuxmuster.net
-# 20260730
+# 20261003
 
 name: Release
+run-name: ${{ inputs.kernels && 'Build kernels' || 'Release' }} (${{ github.ref_name }})
 
 on:
   push:
     tags:
       - 'v[0-9]*'
   workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Create the GitHub release and publish to linuxmuster/deb (off: build only)'
+        type: boolean
+        default: true
+      kernels:
+        description: 'Only build newer kernels and push them to kernels-<x.y> (no package)'
+        type: boolean
+        default: false
 
 jobs:
   resolve:
@@ -50,8 +74,73 @@ jobs:
   # test:
   #   uses: ./.github/workflows/shell-tests.yml
 
+  kernels:
+    needs: resolve
+    if: inputs.kernels
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    permissions:
+      contents: write
+    concurrency:
+      group: kernels-${{ github.ref_name }}
+      cancel-in-progress: false
+    container:
+      image: ${{ needs.resolve.outputs.image }}
+      options: --user root
+
+    defaults:
+      run:
+        shell: bash
+        working-directory: build
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          path: build
+
+      - name: Check kernel build support
+        run: |
+          if [ ! -x build/bin/kernel-sync.sh ]; then
+            echo "::error::$GITHUB_REF_NAME has no build/bin/kernel-sync.sh, kernel builds are not supported."
+            exit 1
+          fi
+
+      - name: Pull prebuilt kernels
+        run: |
+          git config --global --add safe.directory "$PWD"
+          git config --global user.name github-actions
+          git config --global user.email github-actions@github.com
+          build/bin/kernel-sync.sh pull
+
+      - name: Build newer kernels
+        env:
+          BUILDKERNELS: 'yes'
+          KERNELSONLY: 'yes'
+        run: |
+          source /opt/lmndev/build/common.sh
+          install_missing_deps
+          if command -v ccache > /dev/null; then
+            export PATH="/usr/lib/ccache:$PATH"
+          fi
+          for script in build/run.d/[12]*; do
+            echo "::group::$(basename "$script")"
+            "$script"
+            echo "::endgroup::"
+          done
+
+      - name: Push prebuilt kernels
+        run: |
+          KBRANCH="kernels-$(dpkg-parsechangelog -S Version | cut -d. -f1-2)"
+          if [ "$KBRANCH" != "kernels-$GITHUB_REF_NAME" ]; then
+            echo "Workflow runs on $GITHUB_REF_NAME, not pushing to $KBRANCH."
+            exit 0
+          fi
+          build/bin/kernel-sync.sh push
+
   build:
     needs: resolve # add ", test" here once the test: job above is enabled
+    if: ${{ !inputs.kernels }}
     runs-on: ubuntu-latest
     container:
       image: ${{ needs.resolve.outputs.image }}
@@ -74,6 +163,14 @@ jobs:
           echo "version=$(dpkg-parsechangelog -S Version)" >> "$GITHUB_OUTPUT"
           echo "distribution=$(dpkg-parsechangelog -S Distribution)" >> "$GITHUB_OUTPUT"
 
+      - name: Pull prebuilt kernels
+        working-directory: build
+        run: |
+          git config --global --add safe.directory "$PWD"
+          if [ -x build/bin/kernel-sync.sh ]; then
+            build/bin/kernel-sync.sh pull
+          fi
+
       - name: Build package
         run: /opt/lmndev/build/linuxmuster-linbo7.sh
         env:
@@ -87,6 +184,7 @@ jobs:
 
   release:
     needs: build
+    if: github.event_name == 'push' || inputs.publish
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -107,6 +205,7 @@ jobs:
 
   publish:
     needs: [build, release]
+    if: github.event_name == 'push' || inputs.publish
     runs-on: ubuntu-latest
 
     steps:
