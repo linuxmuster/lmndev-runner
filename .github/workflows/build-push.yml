@@ -1,12 +1,13 @@
 # lmndev-runner: Build and push Docker images to GHCR
 #
-# Triggered on push to main (excluding documentation changes)
-# or manually via workflow_dispatch.
+# Triggered on push to main (excluding documentation and the workflow
+# samples in workflows/, which are not part of the image) or manually
+# via workflow_dispatch.
 # Builds one image per Ubuntu version defined in the matrix;
 # the primary version (currently 26.04) also receives the :latest tag.
 #
 # thomas@linuxmuster.net
-# 20260730
+# 20261003
 
 name: Build and Push Docker Image
 
@@ -18,7 +19,8 @@ on:
       - main
     paths-ignore:
       - "*.md"
-      - "anforderungen.md.de"
+      - "*.md.de"
+      - "workflows/**"
   workflow_dispatch:
 
 env:
